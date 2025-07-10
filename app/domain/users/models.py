@@ -6,7 +6,7 @@ from app.core.database import Base
 class Role(Base):
     __tablename__ = 'roles'
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[Text] = mapped_column(unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
 
     users: Mapped[list["User"]] = relationship(
         secondary="user_roles",
@@ -18,11 +18,11 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
-    first_name: Mapped[Text] = mapped_column(nullable=False)
-    last_name: Mapped[Text] = mapped_column(nullable=False)
-    email: Mapped[Text] = mapped_column(nullable=False, unique=True)
-    phone_number: Mapped[Text] = mapped_column(nullable=True, unique=True)
-    password_hash: Mapped[Text] = mapped_column(nullable=False)
+    first_name: Mapped[str] = mapped_column(Text, nullable=False)
+    last_name: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    phone_number: Mapped[str] = mapped_column(Text, nullable=True, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
 
     roles: Mapped[list["Role"]] = relationship(
         secondary="user_roles",
