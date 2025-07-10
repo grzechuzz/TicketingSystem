@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, Identity, Text, Date, TIMESTAMP, func, DateTime
+from sqlalchemy import ForeignKey, Identity, Text, text, Date, TIMESTAMP
 from app.core.database import Base
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 class Role(Base):
     __tablename__ = 'roles'
@@ -10,7 +10,7 @@ class Role(Base):
 
     users: Mapped[list["User"]] = relationship(
         secondary="user_roles",
-        backref="roles"
+        back_populates="roles"
     )
 
 
@@ -21,10 +21,13 @@ class User(Base):
     first_name: Mapped[str] = mapped_column(Text, nullable=False)
     last_name: Mapped[str] = mapped_column(Text, nullable=False)
     email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    phone_number: Mapped[str] = mapped_column(Text, nullable=True, unique=True)
+    phone_number: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True),
+                                                 default=lambda: datetime.now(timezone.utc),
+                                                 server_default=text("timezone('utc', now())"),
+                                                 nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     roles: Mapped[list["Role"]] = relationship(
@@ -38,5 +41,4 @@ class UserRole(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
-
 
