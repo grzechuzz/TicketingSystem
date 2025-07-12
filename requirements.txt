@@ -4,6 +4,7 @@ sqlalchemy[asyncio]>=2.0
 asyncpg
 alembic
 pydantic
+pydantic[email]
 python-dotenv
 argon2-cffi
 python-jose[cryptography]
