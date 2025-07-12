@@ -12,7 +12,7 @@ DATABASE_URL = (f"postgresql+asyncpg://"
 
 engine = create_async_engine(DATABASE_URL)
 
-AsyncSessionLocal = async_sessionmaker(bind=engine)
+AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 
 Base = declarative_base()
 
