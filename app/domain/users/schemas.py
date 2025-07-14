@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
-from datetime import date
+from datetime import date, datetime
+from typing import Literal
 import re
 
 
@@ -46,3 +47,19 @@ class UserReadDTO(BaseModel):
     last_name: str
     phone_number: str | None
     birth_date: date | None
+
+class Token(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int = Field(description='Expiration time in seconds')
+
+class TokenPayload(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    sub: str
+    roles: list[str]
+    iat: datetime
+    exp: datetime
+

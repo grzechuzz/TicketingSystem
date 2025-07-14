@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, status, Response
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.domain.users.schemas import UserCreateDTO, UserReadDTO
-from app.domain.users.services import create_user
+from app.core.security import ACCESS_TOKEN_EXPIRE_MINUTES
+from app.domain.users.schemas import UserCreateDTO, UserReadDTO, Token
+from app.services.user_service import create_user, login_user
 from typing import Annotated
 
 router = APIRouter(prefix='/auth', tags=['auth'])
@@ -19,3 +21,9 @@ async def register(db: db_dependency, model: UserCreateDTO, response: Response):
     user = await create_user(model, db)
     response.headers['Location'] = f"api/v1/users/{user.id}"
     return UserReadDTO.model_validate(user)
+
+@router.post("/login", response_model=Token)
+async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
+    token = await login_user(form.username, form.password, db)
+    return {"access_token": token, "token_type": "bearer", "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60}
+
