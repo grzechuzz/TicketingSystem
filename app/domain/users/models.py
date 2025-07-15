@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, Identity, Text, text, Date, TIMESTAMP, Table, Column
+from sqlalchemy import Identity, Text, text, Date, TIMESTAMP
 from app.core.database import Base
 from datetime import date, datetime, timezone
+from app.domain import user_roles, organizers_users
+
 
 class Role(Base):
     __tablename__ = 'roles'
@@ -30,13 +32,15 @@ class User(Base):
                                                  nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
-    roles: Mapped[list['Role']] = relationship(secondary="user_roles", back_populates="users")
-    organizers: Mapped[list['Organizer']] = relationship(back_populates='users', secondary='organizers_users')
+    roles: Mapped[list['Role']] = relationship(
+        secondary=user_roles,
+        back_populates="users",
+        lazy='selectin'
+    )
 
+    organizers: Mapped[list['Organizer']] = relationship(
+        secondary=organizers_users,
+        back_populates='users',
+        lazy='selectin'
+    )
 
-user_roles = Table(
-    "user_roles",
-    Base.metadata,
-    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
-)
