@@ -5,9 +5,9 @@ from .models import Role, User
 async def get_role_by_name(name: str, db: AsyncSession) -> Role | None:
     stmt = select(Role).where(Role.name == name)
     result = await db.execute(stmt)
-    return result.one_or_none()
+    return result.scalars().first()
 
 async def get_user_by_email(email: str, db: AsyncSession) -> User | None:
     stmt = select(User).where(User.email == email)
     result = await db.execute(stmt)
-    return result.one_or_none()
+    return result.scalars().first()
