@@ -30,10 +30,8 @@ class User(Base):
                                                  nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
-    roles: Mapped[list["Role"]] = relationship(
-        secondary="user_roles",
-        back_populates="users"
-    )
+    roles: Mapped[list["Role"]] = relationship(secondary="user_roles", back_populates="users")
+    organizers: Mapped[list["Organizer"]] = relationship(back_populates='users', secondary='organizers_users')
 
 
 class UserRole(Base):
@@ -41,4 +39,3 @@ class UserRole(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
-
