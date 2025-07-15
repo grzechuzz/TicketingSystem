@@ -36,3 +36,14 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: db
         )
 
     return user
+
+def require_roles(*allowed_roles: str):
+    async def _require_roles(user: Annotated[User, Depends(get_current_user)]) -> User:
+        user_roles = {r.name for r in user.roles}
+        if not user_roles.intersection(allowed_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied"
+            )
+        return user
+    return _require_roles
