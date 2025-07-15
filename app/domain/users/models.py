@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, Identity, Text, text, Date, TIMESTAMP
+from sqlalchemy import ForeignKey, Identity, Text, text, Date, TIMESTAMP, Table, Column
 from app.core.database import Base
 from datetime import date, datetime, timezone
 
@@ -8,7 +8,7 @@ class Role(Base):
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
 
-    users: Mapped[list["User"]] = relationship(
+    users: Mapped[list['User']] = relationship(
         secondary="user_roles",
         back_populates="roles"
     )
@@ -30,12 +30,13 @@ class User(Base):
                                                  nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
-    roles: Mapped[list["Role"]] = relationship(secondary="user_roles", back_populates="users")
-    organizers: Mapped[list["Organizer"]] = relationship(back_populates='users', secondary='organizers_users')
+    roles: Mapped[list['Role']] = relationship(secondary="user_roles", back_populates="users")
+    organizers: Mapped[list['Organizer']] = relationship(back_populates='users', secondary='organizers_users')
 
 
-class UserRole(Base):
-    __tablename__ = "user_roles"
-
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
+user_roles = Table(
+    "user_roles",
+    Base.metadata,
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
+)

@@ -1,4 +1,4 @@
-from sqlalchemy import Identity, Text, String, ForeignKey, UniqueConstraint, TIMESTAMP
+from sqlalchemy import Identity, Text, String, ForeignKey, UniqueConstraint, TIMESTAMP, Table, Column
 from app.core.database import Base
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from datetime import datetime, timezone
@@ -27,8 +27,9 @@ class Organizer(Base):
     users: Mapped[list['User']] = relationship(back_populates='organizers', secondary='organizers_users')
 
 
-class OrganizerUser(Base):
-    __tablename__ = 'organizers_users'
-
-    organizer_id: Mapped[int] = mapped_column(ForeignKey('organizers.id', ondelete='CASCADE'), primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+organizers_users = Table(
+    'organizers_users',
+    Base.metadata,
+    Column('user_id', ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
+    Column('organizer_id', ForeignKey('organizers.id', ondelete='CASCADE'), primary_key=True),
+)
