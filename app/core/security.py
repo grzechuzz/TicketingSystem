@@ -1,8 +1,8 @@
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+from .config import SECRET_KEY
 from datetime import timedelta, datetime, timezone
 from jose import jwt
-import os
 
 ph = PasswordHasher()
 
@@ -16,7 +16,6 @@ def verify_password(password: str, hashed_password: str) -> bool:
         return False
 
 
-SECURITY_KEY: str = os.getenv("SECURITY_KEY")
 ALGORITHM: str = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
@@ -30,4 +29,4 @@ def create_access_token(subject: str | int, roles: list[str]) -> str:
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp())
     }
-    return jwt.encode(payload, SECURITY_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
