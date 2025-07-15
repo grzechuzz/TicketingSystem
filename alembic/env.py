@@ -9,7 +9,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.database import Base
-from app.domain.users.models import User
+from app.domain.users import models
+from app.domain.addresses import models
 
 from alembic import context
 
