@@ -22,3 +22,4 @@ async def create_address(model: AddressCreateDTO, db: db_dependency):
     db.add(address)
     await db.commit()
     return AddressReadDTO.model_validate(address)
+
