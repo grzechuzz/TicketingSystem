@@ -25,7 +25,7 @@ class Organizer(Base):
         UniqueConstraint('country_code', 'registration_number', name='uq_organizers_country_reg_number'),
     )
 
-    address: Mapped['Address'] = relationship(back_populates='organizers')
+    address: Mapped['Address'] = relationship(back_populates='organizers', lazy='selectin')
 
     users: Mapped[list['User']] = relationship(
         back_populates='organizers',

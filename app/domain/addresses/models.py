@@ -13,4 +13,5 @@ class Address(Base):
     apartment_number: Mapped[str | None] = mapped_column(String(10), nullable=True)
     country_code: Mapped[str] = mapped_column(String(2), nullable=False)
 
-    organizers: Mapped[list['Organizer']] = relationship(back_populates="address")
+    organizers: Mapped[list['Organizer']] = relationship(back_populates="address", lazy='selectin')
+    venues: Mapped[list['Venue']] = relationship(back_populates="address", lazy='selectin')
