@@ -15,15 +15,13 @@ async def list_all(db: AsyncSession) -> list[Organizer]:
 async def create(db: AsyncSession, data: dict) -> Organizer:
     organizer = Organizer(**data)
     db.add(organizer)
-    await db.commit()
     return organizer
 
-async def update(db: AsyncSession, organizer: Organizer, data: dict) -> Organizer:
+async def update(organizer: Organizer, data: dict) -> Organizer:
     for key, value in data.items():
         setattr(organizer, key, value)
-    await db.commit()
     return organizer
 
 async def delete(db: AsyncSession, organizer: Organizer) -> None:
     await db.delete(organizer)
-    await db.commit()
+
