@@ -16,7 +16,9 @@ async def list_organizers(db: AsyncSession) -> list[Organizer]:
 
 async def create_organizer(db: AsyncSession, schema: OrganizerCreateDTO) -> Organizer:
     data = schema.model_dump(exclude_none=True)
-    return await crud.create(db, data)
+    async with db.begin():
+        organizer = await crud.create(db, data)
+    return organizer
 
 async def get_authorized_organizer(db: AsyncSession, organizer_id: int, current_user: User) -> Organizer:
     organizer = await get_organizer(db, organizer_id)
@@ -38,8 +40,11 @@ async def update_organizer(
 ) -> Organizer:
     organizer = await get_authorized_organizer(db, organizer_id, current_user)
     data = schema.model_dump(exclude_none=True)
-    return await crud.update(db, organizer, data)
+    async with db.begin():
+        organizer = await crud.update(organizer, data)
+    return organizer
 
 async def delete_organizer(db: AsyncSession, organizer_id: int) -> None:
     organizer = await get_organizer(db, organizer_id)
-    return await crud.delete(db, organizer)
+    async with db.begin():
+        await crud.delete(db, organizer)
