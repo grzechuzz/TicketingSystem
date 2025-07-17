@@ -17,15 +17,15 @@ class OrganizerCreateDTO(BaseModel):
         region = data.get('country_code', '').upper()
 
         if not raw or not raw.strip():
-            raise ValidationError('Phone number is required')
+            raise ValueError('Phone number is required')
 
         try:
             num = parse(raw, region)
         except NumberParseException:
-            raise ValidationError('Invalid phone number format')
+            raise ValueError('Invalid phone number format')
 
         if not is_valid_number(num):
-            raise ValidationError('Invalid phone number')
+            raise ValueError('Invalid phone number')
 
         data['phone_number'] = format_number(num, PhoneNumberFormat.E164)
         return data
