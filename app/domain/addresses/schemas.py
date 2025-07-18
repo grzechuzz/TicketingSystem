@@ -12,6 +12,7 @@ class AddressCreateDTO(BaseModel):
 class AddressReadDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: int
     city: str
     street: str
     postal_code: str
