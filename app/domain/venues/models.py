@@ -27,7 +27,6 @@ class Sector(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     is_ga: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     base_capacity: Mapped[int] = mapped_column(Integer, nullable=False)
-    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         server_default=func.now(),
@@ -39,9 +38,9 @@ class Sector(Base):
         onupdate=func.now(),
         nullable=False
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     venue: Mapped['Venue'] = relationship(back_populates="sectors", lazy='selectin')
-
     __table_args__ = (
         UniqueConstraint("venue_id", "name", name="uq_sector_venue_name"),
         CheckConstraint("base_capacity > 0", name="chk_sector_base_capacity"),
