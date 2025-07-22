@@ -38,7 +38,6 @@ class Sector(Base):
         onupdate=func.now(),
         nullable=False
     )
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     venue: Mapped['Venue'] = relationship(back_populates="sectors", lazy='selectin')
     __table_args__ = (
