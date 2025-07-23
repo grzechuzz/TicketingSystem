@@ -46,7 +46,7 @@ async def list_sectors_by_venue(db: AsyncSession, venue_id: int) -> list[Sector]
 
 
 async def create_sector(db: AsyncSession, venue_id: int, schema: SectorCreateDTO) -> Sector:
-    await get_venue(db, schema.venue_id)
+    await get_venue(db, venue_id)
     data = schema.model_dump(exclude_none=True)
     data["venue_id"] = venue_id
     sector = await crud.create_sector(db, data)
