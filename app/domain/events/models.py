@@ -6,6 +6,8 @@ import enum
 
 
 class EventStatus(str, enum.Enum):
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    REJECTED = "REJECTED"
     PLANNED = "PLANNED"
     ON_SALE = "ON_SALE"
     ENDED = "ENDED"
@@ -30,14 +32,14 @@ class Event(Base):
     event_end: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     sales_start: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     sales_end: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
-    max_tickets_per_user: Mapped[int] = mapped_column(Integer, nullable=True)
-    age_restriction: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_tickets_per_user: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    age_restriction: Mapped[int | None] = mapped_column(Integer, nullable=True)
     holder_data_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[EventStatus] = mapped_column(
         Enum(EventStatus, name="event_status"),
         nullable=False,
-        default=EventStatus.PLANNED
+        default=EventStatus.AWAITING_APPROVAL
     )
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -51,7 +53,6 @@ class Event(Base):
     organizer: Mapped['Organizer'] = relationship(back_populates='events', lazy='selectin')
 
     __table_args__ = (
-        CheckConstraint("event_end > event_start", name="chk_event_time_range"),
-        CheckConstraint("sales_end >= sales_start", name="chk_sales_range"),
-        CheckConstraint("sales_end <= event_start", name="chk_sales_vs_event"),
+        CheckConstraint("event_end >= event_start", name="chk_event_time_range"),
+        CheckConstraint("sales_end >= sales_start", name="chk_sales_range")
     )
