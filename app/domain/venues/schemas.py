@@ -28,7 +28,6 @@ class VenueUpdateDTO(BaseModel):
 
 
 class SectorCreateDTO(BaseModel):
-    venue_id: int
     name: str = Field(min_length=1, max_length=15)
     base_capacity: int = Field(ge=1)
     is_ga: bool = Field(default=False)
