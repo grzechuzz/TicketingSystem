@@ -14,6 +14,7 @@ from app.domain.addresses import models
 from app.domain.organizers import models
 from app.domain.venues import models
 
+
 from alembic import context
 
 load_dotenv()

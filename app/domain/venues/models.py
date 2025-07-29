@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy import Identity, Text, ForeignKey, Boolean, TIMESTAMP, Integer, UniqueConstraint, CheckConstraint
+from sqlalchemy import Identity, Text, ForeignKey, Boolean, TIMESTAMP, Integer, UniqueConstraint, CheckConstraint, func
 from app.core.database import Base
 from app.domain import Address
 from datetime import datetime
@@ -17,7 +17,7 @@ class Venue(Base):
 
     address: Mapped['Address'] = relationship(back_populates="venues", lazy='selectin')
     sectors: Mapped[list['Sector']] = relationship(back_populates="venue", lazy='selectin')
-
+    events: Mapped[list['Event']] = relationship(back_populates="venue", lazy='selectin')
 
 class Sector(Base):
     __tablename__ = "sectors"

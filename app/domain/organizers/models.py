@@ -1,4 +1,4 @@
-from sqlalchemy import Identity, Text, String, ForeignKey, UniqueConstraint, TIMESTAMP
+from sqlalchemy import Identity, Text, String, ForeignKey, UniqueConstraint, TIMESTAMP, func
 from app.core.database import Base
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from datetime import datetime, timezone
@@ -17,7 +17,7 @@ class Organizer(Base):
     iban: Mapped[str | None] = mapped_column(String(34), nullable=True, unique=True)
     country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True),
-                                                 default=lambda: datetime.now(timezone.utc),
+                                                 server_default=func.now(),
                                                  nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
@@ -26,6 +26,7 @@ class Organizer(Base):
     )
 
     address: Mapped['Address'] = relationship(back_populates='organizers', lazy='selectin')
+    events: Mapped[list['Event']] = relationship(back_populates='organizer', lazy='selectin')
 
     users: Mapped[list['User']] = relationship(
         back_populates='organizers',
