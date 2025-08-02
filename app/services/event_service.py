@@ -1,13 +1,27 @@
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.events.models import Event
+from app.domain.events.models import Event, EventStatus
 from app.domain.events.schemas import EventCreateDTO, EventUpdateDTO
+from app.domain.users.models import User
 from app.services.venue_service import get_venue
 from app.domain.events import crud
 from datetime import datetime, timezone
+from typing import Iterable
 
 
-def validate_event_times_on_create(data: dict) -> None:
+PUBLIC_STATUSES = {EventStatus.ON_SALE, EventStatus.PLANNED}
+
+
+def _get_roles(user: User) -> set[str]:
+    return {role.name for role in user.roles}
+
+
+def _get_organizer_ids(user: User) -> set[int]:
+    return {org.id for org in user.organizers}
+
+
+def _validate_event_times_on_create(data: dict) -> None:
     es = data["event_start"]
     ee = data["event_end"]
     ss = data["sales_start"]
@@ -25,11 +39,11 @@ def validate_event_times_on_create(data: dict) -> None:
         )
 
 
-def validate_event_times_on_update(data: dict, ev: Event) -> None:
+def _validate_event_times_on_update(data: dict, ev: Event) -> None:
     es = data.get("event_start", ev.event_start)
-    ee = data.get("event_end",   ev.event_end)
+    ee = data.get("event_end",  ev.event_end)
     ss = data.get("sales_start", ev.sales_start)
-    se = data.get("sales_end",   ev.sales_end)
+    se = data.get("sales_end",  ev.sales_end)
 
     if ee <= es:
         raise HTTPException(
@@ -55,32 +69,92 @@ def validate_event_times_on_update(data: dict, ev: Event) -> None:
         )
 
 
-async def get_event(db: AsyncSession, event_id: int) -> Event:
+async def get_event(db: AsyncSession, event_id: int, user: User) -> Event:
     event = await crud.get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
-    return event
+
+    roles = _get_roles(user)
+
+    if "ADMIN" in roles:
+        return event
+
+    if "ORGANIZER" in roles and event.organizer_id in _get_organizer_ids(user):
+        return event
+
+    if event.status in PUBLIC_STATUSES:
+        return event
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
 
-async def list_events(db: AsyncSession) -> list[Event]:
-    return await crud.list_all_events(db)
+async def list_public_events(db: AsyncSession) -> list[Event]:
+    return await crud.list_events(db, statuses=PUBLIC_STATUSES)
+
+
+async def list_events_for_organizer(db: AsyncSession, user: User) -> list[Event]:
+    if "ORGANIZER" not in _get_roles(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    return await crud.list_events(db, organizer_ids=_get_organizer_ids(user))
+
+
+async def list_events_for_admin(db: AsyncSession, statuses_filters: Iterable[EventStatus] | None = None) -> list[Event]:
+    return await crud.list_events(db, statuses=statuses_filters)
 
 
 async def create_event(db: AsyncSession, organizer_id: int, schema: EventCreateDTO) -> Event:
     await get_venue(db, schema.venue_id)
     data = schema.model_dump(exclude_none=True)
     data['organizer_id'] = organizer_id
-    validate_event_times_on_create(data)
+    _validate_event_times_on_create(data)
+
     event = await crud.create_event(db, data)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
     return event
 
 
-async def update_event(db: AsyncSession, schema: EventUpdateDTO, event_id: int) -> Event:
-    event = await get_event(db, event_id)
+async def update_event(db: AsyncSession, schema: EventUpdateDTO, event: Event) -> Event:
     data = schema.model_dump(exclude_none=True)
-    validate_event_times_on_update(data, event)
+    _validate_event_times_on_update(data, event)
+
     event = await crud.update_event(event, data)
-    await db.commit()
+    try:
+        await db.commit()
+        await db.refresh(event)
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
     return event
 
+
+async def update_event_status(db: AsyncSession, new_status: EventStatus, event_id: int) -> Event:
+    event = await crud.get_event_by_id(db, event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    allowed_transitions = {
+        EventStatus.AWAITING_APPROVAL: {EventStatus.PLANNED, EventStatus.REJECTED},
+        EventStatus.PLANNED: {EventStatus.ON_SALE, EventStatus.CANCELLED},
+        EventStatus.ON_SALE: {EventStatus.ENDED, EventStatus.CANCELLED}
+    }
+
+    current = event.status
+    if new_status == current:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status is already set")
+
+    allowed = allowed_transitions.get(current, set())
+    if new_status not in allowed:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invalid status transition")
+
+    event.status = new_status
+    try:
+        await db.commit()
+        await db.refresh(event)
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Statuses conflict") from e
+    return event
