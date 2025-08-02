@@ -67,12 +67,12 @@ async def create_event(
 @router.get(
     "/admin/events",
     status_code=status.HTTP_200_OK,
-    response_model=list[EventReadDTO]
+    response_model=list[EventReadDTO],
 )
 async def list_admin_events(
         db: db_dependency,
         user: Annotated[User, Depends(get_current_user_with_roles("ADMIN"))],
-        statuses: Annotated[list[EventStatus] | None, Query(None)] = None
+        statuses: Annotated[list[EventStatus] | None, Query()] = None
 ):
     return await event_service.list_events_for_admin(db, statuses)
 
