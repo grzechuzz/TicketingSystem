@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import Event
+from .models import Event, EventStatus
+from typing import Iterable
 
 
 async def get_event_by_id(db: AsyncSession, event_id: int) -> Event | None:
@@ -9,8 +10,17 @@ async def get_event_by_id(db: AsyncSession, event_id: int) -> Event | None:
     return result.scalars().first()
 
 
-async def list_all_events(db: AsyncSession) -> list[Event]:
+async def list_events(
+        db: AsyncSession,
+        *,
+        statuses: Iterable[EventStatus] | None = None,
+        organizer_ids: Iterable[int] | None = None
+) -> list[Event]:
     stmt = select(Event)
+    if statuses is not None:
+        stmt = stmt.where(Event.status.in_(statuses))
+    if organizer_ids is not None:
+        stmt = stmt.where(Event.organizer_id.in_(organizer_ids))
     result = await db.execute(stmt)
     return result.scalars().all()
 
