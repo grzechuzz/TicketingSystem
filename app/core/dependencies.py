@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status, Path
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from typing import Annotated
 from jose import JWTError, jwt
@@ -10,6 +10,7 @@ from app.core.security import ALGORITHM
 from app.core.config import SECRET_KEY
 from app.domain.users.models import User
 from app.domain.users.schemas import TokenPayload
+from app.domain.events.models import Event
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -45,30 +46,34 @@ def get_current_user_with_roles(*allowed_roles: str):
     return _inner
 
 
-def pick_valid_organizer_id(organizer_id: Annotated[int | None, Path(default=None)] = None):
-    async def _inner(user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))]) -> int:
-        if any(r.name == "ADMIN" for r in user.roles):
-            if organizer_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="organizer_id is required for admin"
-                )
-            return organizer_id
-
-        user_orgs = {o.id for o in user.organizers}
-        if not user_orgs:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not linked to any organizer")
-
-        if organizer_id is None:
-            if len(user_orgs) == 1:
-                return next(iter(user_orgs))
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="organizer_id is required, organizer linked to multiple organizers"
-            )
-
-        if organizer_id not in user_orgs:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden for this organizer")
-
+def require_organizer_member(
+        organizer_id: int,
+        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))]
+) -> int:
+    if any(r.name == "ADMIN" for r in user.roles):
         return organizer_id
-    return Depends(_inner)
+
+    if organizer_id not in {o.id for o in user.organizers}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    return organizer_id
+
+
+async def require_event_owner(
+        event_id: int,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))]
+) -> Event:
+    stmt = select(Event).where(Event.id == event_id)
+    result = await db.execute(stmt)
+    event = result.scalars().first()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    if any(r.name == "ADMIN" for r in user.roles):
+        return event
+
+    if event.organizer_id not in {o.id for o in user.organizers}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    return event
