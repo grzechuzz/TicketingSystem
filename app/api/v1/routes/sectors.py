@@ -1,9 +1,9 @@
 from app.services import venue_service
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user_with_roles
-from app.domain.venues.schemas import SectorReadDTO, SectorUpdateDTO
+from app.domain.venues.schemas import SectorReadDTO, SectorUpdateDTO, SeatReadDTO, SeatCreateDTO, SeatBulkCreateDTO
 
 from typing import Annotated
 
@@ -31,3 +31,34 @@ async def get_sector(sector_id: int, db: db_dependency):
 )
 async def rename_sector(sector_id: int, model: SectorUpdateDTO, db: db_dependency):
     return await venue_service.update_sector(db, model, sector_id)
+
+
+@router.post(
+    "/{sector_id}/seats/single",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SeatReadDTO,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
+)
+async def create_seat_for_sector(sector_id: int, model: SeatCreateDTO, db: db_dependency, response: Response):
+    seat = await venue_service.create_seat(db, model, sector_id)
+    response.headers["Location"] = f"/seats/{seat.id}"
+    return seat
+
+
+@router.post(
+    "/{sector_id}/seats",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))],
+)
+async def bulk_add_seats_for_sector(sector_id: int, model: SeatBulkCreateDTO, db: db_dependency):
+    return await venue_service.bulk_create_seats(db, model, sector_id)
+
+
+@router.get(
+    "/{sector_id}/seats",
+    status_code=status.HTTP_200_OK,
+    response_model=list[SeatReadDTO],
+    dependencies=[Depends(get_current_user_with_roles("ADMIN", "ORGANIZER", "CUSTOMER"))]
+)
+async def get_all_seats_by_sector(sector_id: int, db: db_dependency):
+    return await venue_service.list_seats_by_sector(db, sector_id)
