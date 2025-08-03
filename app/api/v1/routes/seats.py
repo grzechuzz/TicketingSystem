@@ -36,4 +36,4 @@ async def update_seat(seat_id: int, model: SeatUpdateDTO, db: db_dependency):
     dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
 async def delete_seat(seat_id: int, db: db_dependency):
-    await venue_service.delete_seat(db, seat_id)
+    return await venue_service.delete_seat(db, seat_id)
