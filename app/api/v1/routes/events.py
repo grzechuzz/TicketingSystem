@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import require_organizer_member, require_event_owner, get_current_user_with_roles
 from app.domain.events.schemas import EventCreateDTO, EventReadDTO, EventUpdateDTO, EventStatusDTO
+from app.domain.ticketing.schemas import EventSectorReadDTO, EventSectorCreateDTO, EventSectorBulkCreateDTO
 from app.domain.users.models import User
-from app.services import event_service
+from app.services import event_service, event_sectors_service
 from app.domain.events.models import Event, EventStatus
 
 router = APIRouter(tags=["events"])
@@ -31,7 +32,6 @@ async def get_event(
         event_id: int,
         db: db_dependency,
         user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER", "CUSTOMER"))]
-
 ):
     return await event_service.get_event(db, event_id, user)
 
@@ -102,3 +102,66 @@ async def patch_event(
 async def patch_event_status(event_id: int, schema: EventStatusDTO, db: db_dependency):
     event = await event_service.update_event_status(db, schema.new_status, event_id)
     return event
+
+
+@router.get(
+    "/events/{event_id}/sectors/{sector_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=EventSectorReadDTO,
+    response_model_exclude_none=True,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN", "ORGANIZER", "CUSTOMER"))]
+)
+async def get_event_sector(event_id: int, sector_id: int, db: db_dependency):
+    return await event_sectors_service.get_event_sector(db, event_id, sector_id)
+
+
+@router.get(
+    "/events/{event_id}/sectors",
+    status_code=status.HTTP_200_OK,
+    response_model=list[EventSectorReadDTO],
+    response_model_exclude_none=True,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN", "ORGANIZER", "CUSTOMER"))]
+)
+async def get_all_event_sectors_by_event(event_id: int, db: db_dependency):
+    return await event_sectors_service.list_event_sectors(db, event_id)
+
+
+@router.post(
+    "/events/{event_id}/sectors",
+    status_code=status.HTTP_201_CREATED,
+    response_model=EventSectorReadDTO,
+    response_model_exclude_none=True
+)
+async def create_event_sector_for_event(
+        event: Annotated[Event, Depends(require_event_owner)],
+        model: EventSectorCreateDTO,
+        db: db_dependency,
+        response: Response
+):
+    event_sector = await event_sectors_service.create_event_sector(db, model, event)
+    response.headers["Location"] = f"/events/{event.id}/sectors/{event_sector.sector_id}"
+    return event_sector
+
+
+@router.post(
+    "/events/{event_id}/sectors/bulk",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def bulk_add_event_sectors_for_event(
+    event: Annotated[Event, Depends(require_event_owner)],
+    model: EventSectorBulkCreateDTO,
+    db: db_dependency
+):
+    await event_sectors_service.bulk_create_event_sectors(db, model, event)
+
+
+@router.delete(
+    "/events/{event_id}/sectors/{sector_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_event_sector_for_event(
+    event: Annotated[Event, Depends(require_event_owner)],
+    sector_id: int,
+    db: db_dependency
+):
+    await event_sectors_service.delete_event_sector(db, event.id, sector_id)
