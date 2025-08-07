@@ -1,5 +1,5 @@
 from app.core.database import Base
-from sqlalchemy import Identity, ForeignKey, CheckConstraint, UniqueConstraint
+from sqlalchemy import Identity, ForeignKey, CheckConstraint, UniqueConstraint, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -18,3 +18,10 @@ class EventSector(Base):
         UniqueConstraint('event_id', 'sector_id', name='uq_event_sector'),
         CheckConstraint("tickets_left >= 0", name="chk_tickets_left")
     )
+
+
+class TicketType(Base):
+    __tablename__ = 'ticket_types'
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
