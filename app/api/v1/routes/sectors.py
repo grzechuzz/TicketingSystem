@@ -34,7 +34,7 @@ async def rename_sector(sector_id: int, model: SectorUpdateDTO, db: db_dependenc
 
 
 @router.post(
-    "/{sector_id}/seats/single",
+    "/{sector_id}/seats",
     status_code=status.HTTP_201_CREATED,
     response_model=SeatReadDTO,
     dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
@@ -46,7 +46,7 @@ async def create_seat_for_sector(sector_id: int, model: SeatCreateDTO, db: db_de
 
 
 @router.post(
-    "/{sector_id}/seats",
+    "/{sector_id}/seats/bulk",
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_user_with_roles("ADMIN"))],
 )
