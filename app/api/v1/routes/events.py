@@ -199,7 +199,7 @@ async def create_event_ticket_type_for_event_sector(
 
 
 @router.post(
-    "events/{event_id}/sectors/{sector_id}/ticket-types/bulk",
+    "/events/{event_id}/sectors/{sector_id}/ticket-types/bulk",
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def bulk_add_event_ticket_types_for_event_sector(
