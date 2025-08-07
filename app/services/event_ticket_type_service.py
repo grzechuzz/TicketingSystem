@@ -51,13 +51,11 @@ async def bulk_create_event_ticket_types(
 
 async def update_event_ticket_type(
         db: AsyncSession,
-        event_ticket_type_id: int,
+        event_ticket_type: EventTicketType,
         schema: EventTicketTypeUpdateDTO
 ) -> EventTicketType:
-    event_ticket_type = await get_event_ticket_type(db, event_ticket_type_id)
     data = schema.model_dump(exclude_none=True)
     event_ticket_type = await crud.update_event_ticket_type(event_ticket_type, data)
-
     try:
         await db.commit()
     except IntegrityError:
@@ -69,8 +67,7 @@ async def update_event_ticket_type(
     return event_ticket_type
 
 
-async def delete_event_ticket_type(db: AsyncSession, event_ticket_type_id: int) -> None:
-    event_ticket_type = await get_event_ticket_type(db, event_ticket_type_id)
+async def delete_event_ticket_type(db: AsyncSession, event_ticket_type: EventTicketType) -> None:
     await crud.delete_event_ticket_type(db, event_ticket_type)
     try:
         await db.commit()
