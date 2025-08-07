@@ -4,9 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import require_organizer_member, require_event_owner, get_current_user_with_roles
 from app.domain.events.schemas import EventCreateDTO, EventReadDTO, EventUpdateDTO, EventStatusDTO
-from app.domain.ticketing.schemas import EventSectorReadDTO, EventSectorCreateDTO, EventSectorBulkCreateDTO
+from app.domain.ticketing.schemas import EventSectorReadDTO, EventSectorCreateDTO, EventSectorBulkCreateDTO, \
+    EventTicketTypeBulkCreateDTO, EventTicketTypeCreateDTO, EventTicketTypeReadDTO
 from app.domain.users.models import User
-from app.services import event_service, event_sectors_service
+from app.services import event_service, event_sectors_service, event_ticket_type_service
 from app.domain.events.models import Event, EventStatus
 
 router = APIRouter(tags=["events"])
@@ -148,9 +149,9 @@ async def create_event_sector_for_event(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def bulk_add_event_sectors_for_event(
-    event: Annotated[Event, Depends(require_event_owner)],
-    model: EventSectorBulkCreateDTO,
-    db: db_dependency
+        event: Annotated[Event, Depends(require_event_owner)],
+        model: EventSectorBulkCreateDTO,
+        db: db_dependency
 ):
     await event_sectors_service.bulk_create_event_sectors(db, model, event)
 
@@ -160,8 +161,52 @@ async def bulk_add_event_sectors_for_event(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_event_sector_for_event(
-    event: Annotated[Event, Depends(require_event_owner)],
-    sector_id: int,
-    db: db_dependency
+        event: Annotated[Event, Depends(require_event_owner)],
+        sector_id: int,
+        db: db_dependency
 ):
     await event_sectors_service.delete_event_sector(db, event.id, sector_id)
+
+
+@router.get(
+    "/events/{event_id}/sectors/{sector_id}/ticket-types",
+    response_model=list[EventTicketTypeReadDTO],
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN", "ORGANIZER", "CUSTOMER"))]
+)
+async def list_ticket_types_for_event_sector(event_id: int, sector_id: int, db: db_dependency):
+    event_sector = await event_sectors_service.get_event_sector(db, event_id, sector_id)
+    return await event_ticket_type_service.list_event_sector_ticket_types(db, event_sector.id)
+
+
+@router.post(
+    "/events/{event_id}/sectors/{sector_id}/ticket-types",
+    status_code=status.HTTP_201_CREATED,
+    response_model=EventTicketTypeReadDTO,
+    response_model_exclude_none=True
+)
+async def create_event_ticket_type_for_event_sector(
+        event: Annotated[Event, Depends(require_event_owner)],
+        sector_id: int,
+        schema: EventTicketTypeCreateDTO,
+        db: db_dependency,
+        response: Response
+):
+    event_sector = await event_sectors_service.get_event_sector(db, event.id, sector_id)
+    event_ticket_type = await event_ticket_type_service.create_event_ticket_type(db, schema, event_sector)
+    response.headers["Location"] = f"/event-ticket-types/{event_ticket_type.id}"
+    return event_ticket_type
+
+
+@router.post(
+    "events/{event_id}/sectors/{sector_id}/ticket-types/bulk",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def bulk_add_event_ticket_types_for_event_sector(
+    event: Annotated[Event, Depends(require_event_owner)],
+    sector_id: int,
+    schema: EventTicketTypeBulkCreateDTO,
+    db: db_dependency
+):
+    event_sector = await event_sectors_service.get_event_sector(db, event.id, sector_id)
+    await event_ticket_type_service.bulk_create_event_ticket_types(db, schema, event_sector)
