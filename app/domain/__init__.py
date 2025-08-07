@@ -4,8 +4,9 @@ from .organizers.models import Organizer
 from .users.models import User, Role
 from .venues.models import Venue, Sector, Seat
 from .events.models import Event
+from .ticketing.models import EventSector, TicketType
 
 __all__ = (
-    "user_roles", "organizers_users", "Address", "Organizer", "User", "Role", "Venue", "Seat",
-    "Sector", "Event"
+    "user_roles", "organizers_users", "Address", "Organizer", "User", "Role", "Venue", "Seat", "Sector",
+    "Event", "EventSector", "TicketType"
 )

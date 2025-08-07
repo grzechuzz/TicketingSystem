@@ -41,6 +41,7 @@ class Sector(Base):
 
     venue: Mapped['Venue'] = relationship(back_populates="sectors", lazy='selectin')
     seats: Mapped[list['Seat']] = relationship(back_populates="sector", lazy='selectin')
+    event_sectors: Mapped[list['EventSector']] = relationship(back_populates='sector', lazy='selectin')
 
     __table_args__ = (
         UniqueConstraint("venue_id", "name", name="uq_sector_venue_name"),
