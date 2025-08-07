@@ -3,8 +3,8 @@ from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user_with_roles, require_event_ticket_type_access
-from app.domain.ticketing.schemas import EventTicketTypeReadDTO, EventTicketTypeUpdateDTO
-from app.domain.ticketing.models import EventTicketType
+from app.domain.event_catalog.schemas import EventTicketTypeReadDTO, EventTicketTypeUpdateDTO
+from app.domain.event_catalog.models import EventTicketType
 from app.services import event_ticket_type_service
 
 

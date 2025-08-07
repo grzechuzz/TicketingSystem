@@ -1,4 +1,4 @@
-from app.domain.ticketing.models import EventSector, TicketType, EventTicketType
+from app.domain.event_catalog.models import EventSector, TicketType, EventTicketType
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
