@@ -44,3 +44,4 @@ class User(Base):
         lazy='selectin'
     )
 
+    orders: Mapped[list["Order"]] = relationship(back_populates="user", lazy='selectin')
