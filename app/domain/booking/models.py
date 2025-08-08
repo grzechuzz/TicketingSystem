@@ -14,19 +14,10 @@ class OrderStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
-class PaymentStatus(str, Enum):
-    PENDING = "PENDING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-
-
-class PaymentMethod(Base):
-    __tablename__ = "payment_methods"
-
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
-    name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-
-    payments: Mapped[list["Payment"]] = relationship(back_populates="payment_method", lazy="selectin")
+class TicketStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    REFUNDED = "REFUNDED"
+    EXPIRED = "EXPIRED"
 
 
 class Order(Base):
@@ -64,30 +55,10 @@ class TicketInstance(Base):
     order: Mapped["Order"] = relationship(back_populates="ticket_instances", lazy="selectin")
     seat: Mapped["Seat"] = relationship(back_populates="ticket_instances", lazy="selectin")
     ticket_holder: Mapped["TicketHolder"] = relationship(back_populates="ticket_instance", lazy="selectin", uselist=False)
+    ticket: Mapped["Ticket"] = relationship(back_populates="ticket_instance", lazy="selectin", uselist=False)
 
     __table_args__ = (
         UniqueConstraint("event_id", "seat_id", name="uq_event_seat"),
-    )
-
-
-class Payment(Base):
-    __tablename__ = "payments"
-
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), nullable=False, index=True)
-    payment_method_id: Mapped[int] = mapped_column(ForeignKey("payment_methods.id"), nullable=False, index=True)
-    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    provider: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[PaymentStatus] = mapped_column(SQLEnum(PaymentStatus, name="payment_status"),
-                                                  nullable=False, server_default=PaymentStatus.PENDING.value)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
-    paid_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
-
-    order: Mapped["Order"] = relationship(back_populates="payments", lazy="selectin")
-    payment_method: Mapped["PaymentMethod"] = relationship(back_populates="payments", lazy="selectin")
-
-    __table_args__ = (
-        CheckConstraint("amount >= 0", name="chk_amount_nonneg"),
     )
 
 
@@ -111,4 +82,27 @@ class TicketHolder(Base):
 
     __table_args__ = (
         CheckConstraint("birth_date <= CURRENT_DATE", name="chk_holder_birth_not_future"),
+    )
+
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    ticket_instance_id: Mapped[int] = mapped_column(ForeignKey("ticket_instances.id", ondelete="RESTRICT"),
+                                                    nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    price_net: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    vat_rate: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False)
+    price_gross: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    status: Mapped[TicketStatus] = mapped_column(SQLEnum(TicketStatus, name="ticket_status"),
+                                                 nullable=False, server_default=TicketStatus.ACTIVE.value)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+
+    ticket_instance: Mapped["TicketInstance"] = relationship(back_populates="ticket", lazy="selectin", uselist=False)
+
+    __table_args__ = (
+        CheckConstraint("price_net >= 0", name="chk_price_net_nonneg"),
+        CheckConstraint("price_gross >= 0", name="chk_price_gross_nonneg"),
+        CheckConstraint("vat_rate >= 1.00", name="chk_vat_rate"),
     )
