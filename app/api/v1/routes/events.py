@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import require_organizer_member, require_event_owner, get_current_user_with_roles
 from app.domain.events.schemas import EventCreateDTO, EventReadDTO, EventUpdateDTO, EventStatusDTO
-from app.domain.ticketing.schemas import EventSectorReadDTO, EventSectorCreateDTO, EventSectorBulkCreateDTO, \
+from app.domain.event_catalog.schemas import EventSectorReadDTO, EventSectorCreateDTO, EventSectorBulkCreateDTO, \
     EventTicketTypeBulkCreateDTO, EventTicketTypeCreateDTO, EventTicketTypeReadDTO
 from app.domain.users.models import User
 from app.services import event_service, event_sectors_service, event_ticket_type_service

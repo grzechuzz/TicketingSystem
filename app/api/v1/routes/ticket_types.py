@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from typing import Annotated
-from app.domain.ticketing.schemas import TicketTypeReadDTO, TicketTypeCreateDTO
+from app.domain.event_catalog.schemas import TicketTypeReadDTO, TicketTypeCreateDTO
 from app.core.dependencies import get_current_user_with_roles
 from app.services import ticket_type_service
 

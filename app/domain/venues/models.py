@@ -58,6 +58,7 @@ class Seat(Base):
     number: Mapped[int] = mapped_column(Integer, nullable=False)
 
     sector: Mapped['Sector'] = relationship(back_populates="seats", lazy='selectin')
+    ticket_instances: Mapped[list["TicketInstance"]] = relationship(back_populates="seat", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("sector_id", "row", "number", name="uq_sector_seat_row_number"),
