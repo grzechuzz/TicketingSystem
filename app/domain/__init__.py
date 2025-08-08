@@ -5,10 +5,11 @@ from .users.models import User, Role
 from .venues.models import Venue, Sector, Seat
 from .events.models import Event
 from .event_catalog.models import EventSector, TicketType, EventTicketType
-from .booking.models import TicketHolder, TicketInstance, PaymentMethod, Payment, Order
+from .payments.models import Payment, PaymentMethod
+from .booking.models import TicketHolder, TicketInstance, Order, Ticket
 
 __all__ = (
     "user_roles", "organizers_users", "Address", "Organizer", "User", "Role", "Venue", "Seat", "Sector",
     "Event", "EventSector", "TicketType", "EventTicketType", "TicketHolder", "TicketInstance", "PaymentMethod",
-    "Payment", "Order"
+    "Payment", "Order", "Ticket"
 )
