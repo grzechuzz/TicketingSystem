@@ -4,7 +4,7 @@ from decimal import Decimal
 from datetime import datetime, date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Identity, text, Text, ForeignKey, Numeric, TIMESTAMP, func, Enum as SQLEnum, UniqueConstraint, \
-    CheckConstraint, Boolean, Date
+    CheckConstraint, Boolean, Date, Index
 
 
 class OrderStatus(str, Enum):
@@ -38,6 +38,7 @@ class Order(Base):
 
     __table_args__ = (
         CheckConstraint("total_price >= 0", name="chk_total_price_nonneg"),
+        Index("uq_orders_user_pending", "user_id", unique=True, postgresql_where=text("status='PENDING'"))
     )
 
 
