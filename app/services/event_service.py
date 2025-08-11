@@ -110,9 +110,8 @@ async def create_event(db: AsyncSession, organizer_id: int, schema: EventCreateD
 
     event = await crud.create_event(db, data)
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError as e:
-        await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
     return event
 
@@ -123,10 +122,9 @@ async def update_event(db: AsyncSession, schema: EventUpdateDTO, event: Event) -
 
     event = await crud.update_event(event, data)
     try:
-        await db.commit()
+        await db.flush()
         await db.refresh(event)
     except IntegrityError as e:
-        await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
     return event
 
@@ -152,9 +150,8 @@ async def update_event_status(db: AsyncSession, new_status: EventStatus, event_i
 
     event.status = new_status
     try:
-        await db.commit()
+        await db.flush()
         await db.refresh(event)
     except IntegrityError as e:
-        await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Statuses conflict") from e
     return event
