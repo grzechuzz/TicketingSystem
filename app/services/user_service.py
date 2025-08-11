@@ -21,15 +21,15 @@ async def create_user(model: UserCreateDTO, db: AsyncSession) -> User:
     db.add(user)
 
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError as e:
-        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User with this email or phone number already exists!"
         ) from e
 
     return user
+
 
 async def authenticate_user(email: str, password: str, db: AsyncSession) -> User:
     user = await get_user_by_email(email, db)
@@ -39,7 +39,6 @@ async def authenticate_user(email: str, password: str, db: AsyncSession) -> User
             detail='Incorrect email or password',
             headers={"WWW-Authenticate": "Bearer"}
         )
-
     return user
 
 async def login_user(email: str, password: str, db: AsyncSession) -> User:

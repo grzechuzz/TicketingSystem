@@ -11,14 +11,16 @@ async def get_organizer(db: AsyncSession, organizer_id: int) -> Organizer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organizer not found")
     return organizer
 
+
 async def list_organizers(db: AsyncSession) -> list[Organizer]:
     return await crud.list_all(db)
+
 
 async def create_organizer(db: AsyncSession, schema: OrganizerCreateDTO) -> Organizer:
     data = schema.model_dump(exclude_none=True)
     organizer = await crud.create(db, data)
-    await db.commit()
     return organizer
+
 
 async def get_authorized_organizer(db: AsyncSession, organizer_id: int, current_user: User) -> Organizer:
     organizer = await get_organizer(db, organizer_id)
@@ -32,6 +34,7 @@ async def get_authorized_organizer(db: AsyncSession, organizer_id: int, current_
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
+
 async def update_organizer(
         db: AsyncSession,
         schema: OrganizerPutDTO,
@@ -41,10 +44,9 @@ async def update_organizer(
     organizer = await get_authorized_organizer(db, organizer_id, current_user)
     data = schema.model_dump(exclude_none=True)
     organizer = await crud.update(organizer, data)
-    await db.commit()
     return organizer
+
 
 async def delete_organizer(db: AsyncSession, organizer_id: int) -> None:
     organizer = await get_organizer(db, organizer_id)
     await crud.delete(db, organizer)
-    await db.commit()
