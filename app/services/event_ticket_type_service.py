@@ -29,9 +29,8 @@ async def create_event_ticket_type(
     event_ticket_type = await crud.create_event_ticket_type(db, data)
 
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError:
-        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This ticket type already defined for this sector"
@@ -46,7 +45,6 @@ async def bulk_create_event_ticket_types(
 ) -> None:
     data = [ett.model_dump(exclude_none=True) for ett in schema.event_ticket_types]
     await crud.bulk_add_event_ticket_types(db, event_sector.id, data)
-    await db.commit()
 
 
 async def update_event_ticket_type(
@@ -57,9 +55,8 @@ async def update_event_ticket_type(
     data = schema.model_dump(exclude_none=True)
     event_ticket_type = await crud.update_event_ticket_type(event_ticket_type, data)
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError:
-        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This ticket type already defined for this sector"
@@ -70,9 +67,8 @@ async def update_event_ticket_type(
 async def delete_event_ticket_type(db: AsyncSession, event_ticket_type: EventTicketType) -> None:
     await crud.delete_event_ticket_type(db, event_ticket_type)
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError:
-        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="EventTicketType in use"
