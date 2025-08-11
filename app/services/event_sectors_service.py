@@ -13,7 +13,7 @@ def _ensure_venue_match(event, sector):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sector does not belong to event venue")
 
 
-async def get_event_sector(db: AsyncSession, event_id: int, sector_id: int) -> EventSector | None:
+async def get_event_sector(db: AsyncSession, event_id: int, sector_id: int) -> EventSector:
     event_sector = await crud.get_event_sector(db, event_id, sector_id)
     if not event_sector:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event_sector not found")
@@ -36,9 +36,8 @@ async def create_event_sector(db: AsyncSession, schema: EventSectorCreateDTO, ev
     event_sector = await crud.create_event_sector(db, data)
 
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError:
-        await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sector already assigned to this event")
     return event_sector
 
@@ -55,14 +54,12 @@ async def bulk_create_event_sectors(db: AsyncSession, schema: EventSectorBulkCre
         data.append(d)
 
     await crud.bulk_add_event_sectors(db, event.id, data)
-    await db.commit()
 
 
 async def delete_event_sector(db: AsyncSession, event_id: int, sector_id: int) -> None:
     event_sector = await get_event_sector(db, event_id, sector_id)
     await crud.delete_event_sector(db, event_sector)
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError:
-        await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event sector in use")
