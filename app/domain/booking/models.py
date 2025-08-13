@@ -52,6 +52,9 @@ class TicketInstance(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     reserved_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(),
                                                   nullable=False)
+    price_net_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    vat_rate_snapshot: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False)
+    price_gross_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
     order: Mapped["Order"] = relationship(back_populates="ticket_instances", lazy="selectin")
     seat: Mapped["Seat"] = relationship(back_populates="ticket_instances", lazy="selectin")
@@ -60,6 +63,9 @@ class TicketInstance(Base):
 
     __table_args__ = (
         UniqueConstraint("event_id", "seat_id", name="uq_event_seat"),
+        CheckConstraint("price_net_snapshot >= 0", name="chk_price_net_nonneg"),
+        CheckConstraint("price_gross_snapshot >= 0", name="chk_price_gross_nonneg"),
+        CheckConstraint("vat_rate_snapshot >= 1.00", name="chk_vat_rate")
     )
 
 
@@ -93,17 +99,8 @@ class Ticket(Base):
     ticket_instance_id: Mapped[int] = mapped_column(ForeignKey("ticket_instances.id", ondelete="RESTRICT"),
                                                     nullable=False, unique=True)
     code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    price_net: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    vat_rate: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False)
-    price_gross: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     status: Mapped[TicketStatus] = mapped_column(SQLEnum(TicketStatus, name="ticket_status"),
                                                  nullable=False, server_default=TicketStatus.ACTIVE.value)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     ticket_instance: Mapped["TicketInstance"] = relationship(back_populates="ticket", lazy="selectin", uselist=False)
-
-    __table_args__ = (
-        CheckConstraint("price_net >= 0", name="chk_price_net_nonneg"),
-        CheckConstraint("price_gross >= 0", name="chk_price_gross_nonneg"),
-        CheckConstraint("vat_rate >= 1.00", name="chk_vat_rate"),
-    )
