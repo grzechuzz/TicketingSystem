@@ -88,6 +88,10 @@ async def reserve_ticket(
                 detail="Ticket limit for this event exceeded"
             )
 
+    price_net = event_ticket_type.price_net
+    vat_rate = event_ticket_type.vat_rate
+    price_gross = (price_net * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
     # Part 5 - add ticket instance, check ticket availability and verify seat (if ticket is seated)
     if seat_id is not None:
         seat = await db.scalar(select(Seat).where(Seat.id == seat_id))
@@ -101,7 +105,10 @@ async def reserve_ticket(
                 event_ticket_type_id=event_ticket_type_id,
                 seat_id=seat_id,
                 event_id=event_id,
-                order_id=order.id
+                order_id=order.id,
+                price_net_snapshot=price_net,
+                vat_rate_snapshot=vat_rate,
+                price_gross_snapshot=price_gross
             )
             db.add(ticket_instance)
             await db.flush()
@@ -120,16 +127,16 @@ async def reserve_ticket(
         ticket_instance = TicketInstance(
             event_ticket_type_id=event_ticket_type_id,
             event_id=event_id,
-            order_id=order.id
+            order_id=order.id,
+            price_net_snapshot=price_net,
+            vat_rate_snapshot=vat_rate,
+            price_gross_snapshot=price_gross
         )
         db.add(ticket_instance)
         await db.flush()
 
-    # Part 6 - ticket prices & vat rate snapshots
-    price = event_ticket_type.price_net * event_ticket_type.vat_rate
-    price_gross = price.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    order.total_price = (order.total_price or Decimal("0")) + price_gross
+    # Part 6 - update order
+    order.total_price = (order.total_price or Decimal("0")) + ticket_instance.price_gross_snapshot
     order.reserved_until = now + timedelta(minutes=20)
 
     return order, ticket_instance
