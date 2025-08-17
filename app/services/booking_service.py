@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app.domain.booking.models import Order, OrderStatus, TicketInstance
 from app.domain.events.models import Event, EventStatus
 from app.domain.event_catalog.models import EventTicketType, EventSector
-from app.domain.venues.models import Seat
+from app.domain.venues.models import Seat, Sector
 from app.domain.users.models import User
 
 
@@ -140,3 +140,53 @@ async def reserve_ticket(
     order.reserved_until = now + timedelta(minutes=20)
 
     return order, ticket_instance
+
+
+async def get_user_pending_order(db: AsyncSession, user: User) -> Order | None:
+    pending_order = await db.scalar(
+        select(Order).where(Order.user_id == user.id, Order.status == OrderStatus.PENDING)
+    )
+    if not pending_order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No pending order found")
+    return pending_order
+
+
+async def remove_ticket_instance(db: AsyncSession, user: User, ticket_instance_id: int) -> None:
+    ticket_instance = await db.scalar(select(TicketInstance).where(TicketInstance.id == ticket_instance_id))
+    if not ticket_instance:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket instance not found")
+
+    order = await db.scalar(
+        select(Order)
+        .where(
+            Order.id == ticket_instance.order_id,
+            Order.user_id == user.id,
+            Order.status == OrderStatus.PENDING
+        )
+        .with_for_update()
+    )
+
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found in order")
+
+    event_ticket_type = await db.scalar(
+        select(EventTicketType)
+        .join(EventSector)
+        .join(Sector)
+        .where(EventTicketType.id == ticket_instance.event_ticket_type_id)
+    )
+
+    if event_ticket_type.event_sector.sector.is_ga:
+        await db.execute(
+            update(EventSector)
+            .where(EventSector.id == event_ticket_type.event_sector_id)
+            .values(tickets_left=EventSector.tickets_left + 1)
+        )
+
+    gross = ticket_instance.price_gross_snapshot
+    order.total_price = max((order.total_price or Decimal("0")) - gross, Decimal("0"))
+
+    await db.delete(ticket_instance)
+    await db.flush()
+
+
