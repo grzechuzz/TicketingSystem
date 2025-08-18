@@ -20,6 +20,11 @@ class TicketStatus(str, Enum):
     EXPIRED = "EXPIRED"
 
 
+class InvoiceType(str, Enum):
+    PERSON = "PERSON"
+    COMPANY = "COMPANY"
+
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -35,6 +40,7 @@ class Order(Base):
     user: Mapped["User"] = relationship(back_populates="orders", lazy="selectin")
     ticket_instances: Mapped[list["TicketInstance"]] = relationship(back_populates="order", lazy="selectin")
     payments: Mapped[list["Payment"]] = relationship(back_populates="order", lazy="selectin")
+    invoice: Mapped["Invoice"] = relationship(back_populates="order", lazy="selectin", uselist=False)
 
     __table_args__ = (
         CheckConstraint("total_price >= 0", name="chk_total_price_nonneg"),
@@ -104,3 +110,27 @@ class Ticket(Base):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     ticket_instance: Mapped["TicketInstance"] = relationship(back_populates="ticket", lazy="selectin", uselist=False)
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True
+    )
+    invoice_type: Mapped[InvoiceType] = mapped_column(SQLEnum(InvoiceType, name="invoice_type"), nullable=False)
+    # PERSON: full_name, COMPANY: company_name + tax_id
+    full_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    company_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tax_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    street: Mapped[str] = mapped_column(Text, nullable=False)
+    postal_code: Mapped[str] = mapped_column(Text, nullable=False)
+    city: Mapped[str] = mapped_column(Text, nullable=False)
+    country_code: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped["Order"] = relationship(back_populates="invoice", lazy="selectin", uselist=False)
