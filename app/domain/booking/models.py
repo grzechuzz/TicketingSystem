@@ -66,6 +66,7 @@ class TicketInstance(Base):
     seat: Mapped["Seat"] = relationship(back_populates="ticket_instances", lazy="selectin")
     ticket_holder: Mapped["TicketHolder"] = relationship(back_populates="ticket_instance", lazy="selectin", uselist=False)
     ticket: Mapped["Ticket"] = relationship(back_populates="ticket_instance", lazy="selectin", uselist=False)
+    event: Mapped["Event"] = relationship(back_populates="ticket_instances", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("event_id", "seat_id", name="uq_event_seat"),
