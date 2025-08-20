@@ -49,7 +49,7 @@ async def list_organizer_events(
 
 
 @router.post(
-    "/organizers/{organizer_id:int}/events",
+    "/organizers/{organizer_id}/events",
     status_code=status.HTTP_201_CREATED,
     response_model=EventReadDTO,
     response_model_exclude_none=True
