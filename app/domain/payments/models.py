@@ -34,7 +34,7 @@ class Payment(Base):
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[PaymentStatus] = mapped_column(SQLEnum(PaymentStatus, name="payment_status"),
                                                   nullable=False, server_default=PaymentStatus.PENDING.value)
-    idempotency_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     paid_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
