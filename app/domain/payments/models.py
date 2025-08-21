@@ -4,7 +4,7 @@ from decimal import Decimal
 from datetime import datetime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Identity, Text, ForeignKey, Numeric, TIMESTAMP, func, Enum as SQLEnum, UniqueConstraint, \
-    CheckConstraint
+    CheckConstraint, Boolean, text
 
 
 class PaymentStatus(str, Enum):
@@ -18,6 +18,7 @@ class PaymentMethod(Base):
 
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
 
     payments: Mapped[list["Payment"]] = relationship(back_populates="payment_method", lazy="selectin")
 
