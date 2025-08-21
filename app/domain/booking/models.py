@@ -44,7 +44,12 @@ class Order(Base):
 
     __table_args__ = (
         CheckConstraint("total_price >= 0", name="chk_total_price_nonneg"),
-        Index("uq_orders_user_pending", "user_id", unique=True, postgresql_where=text("status='PENDING'"))
+        Index(
+            "uq_orders_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('PENDING', 'AWAITING_PAYMENT')")
+        ),
     )
 
 
