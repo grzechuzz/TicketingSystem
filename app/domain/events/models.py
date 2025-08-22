@@ -52,6 +52,7 @@ class Event(Base):
     venue: Mapped['Venue'] = relationship(back_populates='events', lazy='selectin')
     organizer: Mapped['Organizer'] = relationship(back_populates='events', lazy='selectin')
     event_sectors: Mapped[list['EventSector']] = relationship(back_populates='event', lazy='selectin')
+    ticket_instances: Mapped[list["TicketInstance"]] = relationship(back_populates='event', lazy='selectin')
 
     __table_args__ = (
         CheckConstraint("event_end >= event_start", name="chk_event_time_range"),

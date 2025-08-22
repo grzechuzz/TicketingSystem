@@ -3,11 +3,12 @@ from enum import Enum
 from decimal import Decimal
 from datetime import datetime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Identity, Text, ForeignKey, Numeric, TIMESTAMP, func, Enum as SQLEnum, UniqueConstraint, \
-    CheckConstraint
+from sqlalchemy import Identity, Text, ForeignKey, Numeric, TIMESTAMP, func, Enum as SQLEnum, CheckConstraint, \
+    Boolean, text, String, Index
 
 
 class PaymentStatus(str, Enum):
+    REQUIRES_ACTION = "REQUIRES_ACTION"
     PENDING = "PENDING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -18,6 +19,7 @@ class PaymentMethod(Base):
 
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
 
     payments: Mapped[list["Payment"]] = relationship(back_populates="payment_method", lazy="selectin")
 
@@ -32,6 +34,7 @@ class Payment(Base):
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[PaymentStatus] = mapped_column(SQLEnum(PaymentStatus, name="payment_status"),
                                                   nullable=False, server_default=PaymentStatus.PENDING.value)
+    idempotency_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     paid_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
@@ -40,4 +43,10 @@ class Payment(Base):
 
     __table_args__ = (
         CheckConstraint("amount >= 0", name="chk_amount_nonneg"),
+        Index(
+            "uq_payments_order_active",
+            "order_id",
+            unique=True,
+            postgresql_where=text("status IN ('PENDING', 'REQUIRES_ACTION')")
+        ),
     )

@@ -46,8 +46,7 @@ async def get(address_id: int, db: db_dependency):
 @router.put(
     "/{address_id}",
     status_code=status.HTTP_200_OK,
-    response_model=AddressReadDTO,
-    dependencies=[Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER'))]
+    response_model=AddressReadDTO
 )
 async def update(
         model: AddressPutDTO,

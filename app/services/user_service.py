@@ -40,8 +40,7 @@ async def authenticate_user(email: str, password: str, db: AsyncSession) -> User
             headers={"WWW-Authenticate": "Bearer"}
         )
     return user
-
-async def login_user(email: str, password: str, db: AsyncSession) -> User:
+async def login_user(email: str, password: str, db: AsyncSession) -> str:
     user = await authenticate_user(email, password, db)
     roles = [r.name for r in user.roles]
     return create_access_token(subject=user.id, roles=roles)

@@ -20,6 +20,11 @@ class TicketStatus(str, Enum):
     EXPIRED = "EXPIRED"
 
 
+class InvoiceType(str, Enum):
+    PERSON = "PERSON"
+    COMPANY = "COMPANY"
+
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -35,10 +40,16 @@ class Order(Base):
     user: Mapped["User"] = relationship(back_populates="orders", lazy="selectin")
     ticket_instances: Mapped[list["TicketInstance"]] = relationship(back_populates="order", lazy="selectin")
     payments: Mapped[list["Payment"]] = relationship(back_populates="order", lazy="selectin")
+    invoice: Mapped["Invoice"] = relationship(back_populates="order", lazy="selectin", uselist=False)
 
     __table_args__ = (
         CheckConstraint("total_price >= 0", name="chk_total_price_nonneg"),
-        Index("uq_orders_user_pending", "user_id", unique=True, postgresql_where=text("status='PENDING'"))
+        Index(
+            "uq_orders_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('PENDING', 'AWAITING_PAYMENT')")
+        ),
     )
 
 
@@ -52,14 +63,21 @@ class TicketInstance(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     reserved_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(),
                                                   nullable=False)
+    price_net_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    vat_rate_snapshot: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False)
+    price_gross_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
     order: Mapped["Order"] = relationship(back_populates="ticket_instances", lazy="selectin")
     seat: Mapped["Seat"] = relationship(back_populates="ticket_instances", lazy="selectin")
     ticket_holder: Mapped["TicketHolder"] = relationship(back_populates="ticket_instance", lazy="selectin", uselist=False)
     ticket: Mapped["Ticket"] = relationship(back_populates="ticket_instance", lazy="selectin", uselist=False)
+    event: Mapped["Event"] = relationship(back_populates="ticket_instances", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("event_id", "seat_id", name="uq_event_seat"),
+        CheckConstraint("price_net_snapshot >= 0", name="chk_price_net_nonneg"),
+        CheckConstraint("price_gross_snapshot >= 0", name="chk_price_gross_nonneg"),
+        CheckConstraint("vat_rate_snapshot >= 1.00", name="chk_vat_rate")
     )
 
 
@@ -93,17 +111,32 @@ class Ticket(Base):
     ticket_instance_id: Mapped[int] = mapped_column(ForeignKey("ticket_instances.id", ondelete="RESTRICT"),
                                                     nullable=False, unique=True)
     code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    price_net: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    vat_rate: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False)
-    price_gross: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     status: Mapped[TicketStatus] = mapped_column(SQLEnum(TicketStatus, name="ticket_status"),
                                                  nullable=False, server_default=TicketStatus.ACTIVE.value)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     ticket_instance: Mapped["TicketInstance"] = relationship(back_populates="ticket", lazy="selectin", uselist=False)
 
-    __table_args__ = (
-        CheckConstraint("price_net >= 0", name="chk_price_net_nonneg"),
-        CheckConstraint("price_gross >= 0", name="chk_price_gross_nonneg"),
-        CheckConstraint("vat_rate >= 1.00", name="chk_vat_rate"),
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True
     )
+    invoice_type: Mapped[InvoiceType] = mapped_column(SQLEnum(InvoiceType, name="invoice_type"), nullable=False)
+    # PERSON: full_name, COMPANY: company_name + tax_id
+    full_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    company_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tax_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    street: Mapped[str] = mapped_column(Text, nullable=False)
+    postal_code: Mapped[str] = mapped_column(Text, nullable=False)
+    city: Mapped[str] = mapped_column(Text, nullable=False)
+    country_code: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped["Order"] = relationship(back_populates="invoice", lazy="selectin", uselist=False)
