@@ -1,9 +1,9 @@
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.event_catalog.models import TicketType
-from app.domain.event_catalog import crud
-from app.domain.event_catalog.schemas import TicketTypeCreateDTO
+from app.domain.pricing.models import TicketType
+from app.domain.pricing import crud
+from app.domain.pricing.schemas import TicketTypeCreateDTO
 
 
 async def get_ticket_type(db: AsyncSession, ticket_type_id: int) -> TicketType:

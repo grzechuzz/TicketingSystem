@@ -4,7 +4,8 @@ from .organizers.models import Organizer
 from .users.models import User, Role
 from .venues.models import Venue, Sector, Seat
 from .events.models import Event
-from .event_catalog.models import EventSector, TicketType, EventTicketType
+from .pricing.models import TicketType, EventTicketType
+from .allocation.models import EventSector
 from .payments.models import Payment, PaymentMethod
 from .booking.models import TicketHolder, TicketInstance, Order, Ticket
 
