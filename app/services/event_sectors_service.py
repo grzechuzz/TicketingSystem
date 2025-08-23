@@ -1,10 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.event_catalog.models import EventSector
+from app.domain.allocation.models import EventSector
 from app.domain.events.models import Event
-from app.domain.event_catalog import crud
-from app.domain.event_catalog.schemas import EventSectorCreateDTO, EventSectorBulkCreateDTO
+from app.domain.allocation import crud
+from app.domain.allocation.schemas import EventSectorCreateDTO, EventSectorBulkCreateDTO
 from app.services.venue_service import get_sector
 
 

@@ -11,7 +11,7 @@ from app.core.config import SECRET_KEY
 from app.domain.users.models import User
 from app.domain.users.schemas import TokenPayload
 from app.domain.events.models import Event
-from app.domain.event_catalog.models import EventTicketType, EventSector
+from app.domain.pricing.models import EventTicketType, EventSector
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/login")
 

@@ -7,7 +7,8 @@ from sqlalchemy import select, func, update, delete
 from sqlalchemy.dialects.postgresql import insert
 from app.domain.booking.models import Order, OrderStatus, TicketInstance, TicketHolder, Invoice
 from app.domain.events.models import Event, EventStatus
-from app.domain.event_catalog.models import EventTicketType, EventSector
+from app.domain.pricing.models import EventTicketType
+from app.domain.allocation.models import EventSector
 from app.domain.payments.models import Payment, PaymentStatus
 from app.domain.venues.models import Seat, Sector
 from app.domain.users.models import User
