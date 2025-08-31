@@ -66,6 +66,7 @@ class TicketInstance(Base):
     price_net_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     vat_rate_snapshot: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False)
     price_gross_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    ticket_type_name_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
 
     order: Mapped["Order"] = relationship(back_populates="ticket_instances", lazy="selectin")
     seat: Mapped["Seat"] = relationship(back_populates="ticket_instances", lazy="selectin")
