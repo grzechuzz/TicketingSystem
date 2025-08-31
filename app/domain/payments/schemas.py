@@ -1,9 +1,7 @@
 from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.core.text_utils import strip_text
 from decimal import Decimal
-
 from app.domain.payments.models import PaymentStatus
 
 
@@ -56,3 +54,27 @@ class PaymentFinalizeDTO(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     success: bool
+
+
+class PaymentInOrderDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra='forbid')
+
+    id: int
+    amount: Decimal
+    payment_method: PaymentMethodReadDTO
+    paid_at: datetime
+    provider: str
+
+
+class AdminPaymentReadDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra='forbid')
+
+    id: int
+    order_id: int
+    user_id: int
+    user_email: str
+    status: PaymentStatus
+    amount: Decimal
+    payment_method: PaymentMethodReadDTO
+    created_at: datetime
+    paid_at: datetime | None

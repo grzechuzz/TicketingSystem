@@ -1,8 +1,9 @@
 from datetime import datetime, date
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
-from app.domain.booking.models import OrderStatus, InvoiceType
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, EmailStr, AliasChoices, AliasPath
+from app.domain.booking.models import OrderStatus, InvoiceType, TicketStatus
 from app.core.text_utils import strip_text
+from app.domain.payments.schemas import PaymentInOrderDTO
 
 
 class ReserveTicketRequestDTO(BaseModel):
@@ -27,9 +28,12 @@ class TicketInstanceReadDTO(BaseModel):
     id: int
     event_ticket_type_id: int
     seat_id: int | None
+    event_id: int
+    event_name: str = Field(validation_alias=AliasPath('event', 'name'))
     price_net: Decimal = Field(validation_alias='price_net_snapshot')
     vat_rate: Decimal = Field(validation_alias='vat_rate_snapshot')
     price_gross: Decimal = Field(validation_alias='price_gross_snapshot')
+    ticket_type_name: str = Field(validation_alias='ticket_type_name_snapshot')
 
 
 class OrderSummaryDTO(BaseModel):
@@ -42,14 +46,47 @@ class OrderSummaryDTO(BaseModel):
     created_at: datetime
 
 
+class OrderListItemDTO(OrderSummaryDTO):
+    items_count: int | None = None
+
+
 class OrderDetailsDTO(OrderSummaryDTO):
     model_config = ConfigDict(from_attributes=True, extra='forbid')
 
     items: list[TicketInstanceReadDTO] = Field(
         default_factory=list,
-        validation_alias='ticket_instances',
+        validation_alias=AliasChoices('ticket_instances', 'items'),
         serialization_alias='items'
     )
+    payment: PaymentInOrderDTO | None = None
+
+
+class UserOrdersQueryDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    status: OrderStatus | None = None
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+
+
+class AdminOrdersQueryDTO(UserOrdersQueryDTO):
+    user_id: int | None = None
+    email: EmailStr | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
+
+
+class AdminOrderListItemDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra='forbid')
+
+    id: int
+    status: OrderStatus
+    total_price: Decimal
+    reserved_until: datetime
+    created_at: datetime
+    items_count: int
+    user_id: int
+    user_email: EmailStr
 
 
 class InvoiceUpsertDTO(BaseModel):
@@ -102,6 +139,13 @@ class InvoiceReadDTO(BaseModel):
     created_at: datetime
 
 
+class InvoiceDetailsDTO(InvoiceReadDTO):
+    order_id: int
+    total_gross: Decimal
+    total_net: Decimal
+    total_vat: Decimal
+
+
 class TicketHolderUpsertDTO(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -117,6 +161,7 @@ class TicketHolderUpsertDTO(BaseModel):
 
 class TicketHolderReadDTO(BaseModel):
     model_config = ConfigDict(extra='forbid', from_attributes=True)
+
     id: int
     ticket_instance_id: int
     first_name: str
@@ -125,7 +170,44 @@ class TicketHolderReadDTO(BaseModel):
     identification_number: str
 
 
+class TicketHolderPublicDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid', from_attributes=True)
+
+    id: int
+    first_name: str
+    last_name: str
+    identification_suffix: str
+
+
 class InvoiceRequestDTO(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     invoice_requested: bool
+
+
+class TicketReadItemDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra='forbid')
+
+    id: int
+    code: str
+    status: TicketStatus
+    created_at: datetime
+    event_id: int
+    event_name: str
+    event_start: datetime
+    venue_name: str
+    sector_name: str
+    is_ga: bool
+    row: int | None
+    seat: int | None
+    ticket_type_name: str
+    price_gross: Decimal
+    holder: TicketHolderPublicDTO | None = None
+
+
+class AdminOrderDetailsDTO(OrderDetailsDTO):
+    model_config = ConfigDict(from_attributes=True, extra='forbid')
+
+    user_id: int
+    user_email: EmailStr
+    invoice: InvoiceDetailsDTO | None = None
