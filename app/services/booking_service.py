@@ -5,9 +5,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import selectinload
+
 from app.domain.booking.models import Order, OrderStatus, TicketInstance, TicketHolder, Invoice
 from app.domain.events.models import Event, EventStatus
-from app.domain.pricing.models import EventTicketType
+from app.domain.pricing.models import EventTicketType, TicketType
 from app.domain.allocation.models import EventSector
 from app.domain.payments.models import Payment, PaymentStatus
 from app.domain.venues.models import Seat, Sector
@@ -47,6 +49,10 @@ async def reserve_ticket(
         select(EventTicketType)
         .join(EventSector)
         .where(EventTicketType.id == event_ticket_type_id, EventSector.event_id == event_id)
+        .options(
+            selectinload(EventTicketType.ticket_type),
+            selectinload(EventTicketType.event_sector).selectinload(EventSector.sector)
+        )
     )
 
     if not event_ticket_type:
@@ -97,6 +103,7 @@ async def reserve_ticket(
     price_net = event_ticket_type.price_net
     vat_rate = event_ticket_type.vat_rate
     price_gross = (price_net * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    ticket_type_name = event_ticket_type.ticket_type.name
 
     # Part 5 - add ticket instance, check ticket availability and verify seat (if ticket is seated)
     if seat_id is not None:
@@ -114,7 +121,8 @@ async def reserve_ticket(
                 order_id=order.id,
                 price_net_snapshot=price_net,
                 vat_rate_snapshot=vat_rate,
-                price_gross_snapshot=price_gross
+                price_gross_snapshot=price_gross,
+                ticket_type_name_snapshot=ticket_type_name
             )
             db.add(ticket_instance)
             await db.flush()
@@ -136,7 +144,8 @@ async def reserve_ticket(
             order_id=order.id,
             price_net_snapshot=price_net,
             vat_rate_snapshot=vat_rate,
-            price_gross_snapshot=price_gross
+            price_gross_snapshot=price_gross,
+            ticket_type_name_snapshot=ticket_type_name
         )
         db.add(ticket_instance)
         await db.flush()
