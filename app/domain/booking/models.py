@@ -4,7 +4,7 @@ from decimal import Decimal
 from datetime import datetime, date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Identity, text, Text, ForeignKey, Numeric, TIMESTAMP, func, Enum as SQLEnum, UniqueConstraint, \
-    CheckConstraint, Boolean, Date, Index
+    CheckConstraint, Boolean, Date, Index, String
 
 
 class OrderStatus(str, Enum):
@@ -123,6 +123,8 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    invoice_number: Mapped[str | None] = mapped_column(Text, unique=True, index=True, nullable=True)
+    currency_code: Mapped[str] = mapped_column(String(3), nullable=False, server_default="PLN")
     order_id: Mapped[int] = mapped_column(
         ForeignKey("orders.id", ondelete="RESTRICT"),
         nullable=False,
