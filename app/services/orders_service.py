@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.core.pagination import PageDTO
 from app.domain.users.models import User
-from app.domain.booking.models import Order, TicketInstance, Ticket, TicketStatus, Invoice, TicketHolder
+from app.domain.booking.models import Order, TicketInstance, Ticket, TicketStatus, TicketHolder
 from app.domain.venues.models import Venue
 from app.domain.allocation.models import EventSector
 from app.domain.pricing.models import EventTicketType
@@ -12,7 +12,7 @@ from app.domain.events.models import Event
 from app.domain.venues.models import Sector, Seat
 from app.domain.payments.models import Payment, PaymentStatus
 from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, TicketReadItemDTO, \
-    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO, InvoiceDetailsDTO, TicketHolderPublicDTO
+    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO, TicketHolderPublicDTO
 from app.domain.payments.schemas import PaymentInOrderDTO, PaymentMethodReadDTO
 
 
@@ -58,26 +58,6 @@ def _to_order_details(order: Order, payment_dto: PaymentInOrderDTO | None) -> Or
         created_at=order.created_at,
         items=list(order.ticket_instances),
         payment=payment_dto
-    )
-
-
-def _to_invoice_details(invoice: Invoice, order: Order) -> InvoiceDetailsDTO:
-    net, vat, gross = _calc_totals_from_tickets(order.ticket_instances)
-    return InvoiceDetailsDTO(
-        id=invoice.id,
-        invoice_type=invoice.invoice_type,
-        full_name=getattr(invoice, 'full_name', None),
-        company_name=getattr(invoice, 'company_name', None),
-        tax_id=getattr(invoice, 'tax_id', None),
-        street=invoice.street,
-        postal_code=invoice.postal_code,
-        city=invoice.city,
-        country_code=invoice.country_code,
-        created_at=invoice.created_at,
-        order_id=invoice.order_id,
-        total_gross=gross,
-        total_net=net,
-        total_vat=vat
     )
 
 
@@ -278,9 +258,6 @@ async def get_order_admin(db: AsyncSession, order_id: int) -> AdminOrderDetailsD
     )
     payment_dto = _to_payment_in_order(payment) if payment else None
 
-    invoice = await db.scalar(select(Invoice).where(Invoice.order_id == order.id))
-    invoice_dto = _to_invoice_details(invoice, order) if invoice else None
-
     return AdminOrderDetailsDTO(
         id=order.id,
         status=order.status,
@@ -290,6 +267,5 @@ async def get_order_admin(db: AsyncSession, order_id: int) -> AdminOrderDetailsD
         items=list(order.ticket_instances),
         payment=payment_dto,
         user_id=order.user_id,
-        user_email=user_email,
-        invoice=invoice_dto,
+        user_email=user_email
     )
