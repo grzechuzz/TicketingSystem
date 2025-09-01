@@ -12,8 +12,8 @@ from app.domain.venues.schemas import (
 )
 from typing import Annotated
 
-router = APIRouter(prefix='/venues', tags=['venues'])
 
+router = APIRouter(prefix='/venues', tags=['venues'])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -24,8 +24,8 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
     response_model_exclude_none=True,
     dependencies=[Depends(get_current_user_with_roles('ADMIN'))]
 )
-async def create_venue(model: VenueCreateDTO, db: db_dependency, response: Response):
-    venue = await venue_service.create_venue(db, model)
+async def create_venue(schema: VenueCreateDTO, db: db_dependency, response: Response):
+    venue = await venue_service.create_venue(db, schema)
     response.headers["Location"] = f"{router.prefix}/{venue.id}"
     return venue
 
@@ -59,11 +59,11 @@ async def get_venue(venue_id: int, db: db_dependency):
     dependencies=[Depends(get_current_user_with_roles('ADMIN'))]
 )
 async def update_venue(
-        model: VenueUpdateDTO,
         venue_id: int,
+        schema: VenueUpdateDTO,
         db: db_dependency
 ):
-    venue = await venue_service.update_venue(db, model, venue_id)
+    venue = await venue_service.update_venue(db, schema, venue_id)
     return venue
 
 
@@ -75,8 +75,8 @@ async def update_venue(
     dependencies=[Depends(get_current_user_with_roles('ADMIN'))],
     name="create_sector_for_venue"
 )
-async def create_sector_for_venue(venue_id: int, model: SectorCreateDTO, db: db_dependency, response: Response):
-    sector = await venue_service.create_sector(db, venue_id, model)
+async def create_sector_for_venue(venue_id: int, schema: SectorCreateDTO, db: db_dependency, response: Response):
+    sector = await venue_service.create_sector(db, venue_id, schema)
     response.headers["Location"] = f"/sectors/{sector.id}"
     return sector
 

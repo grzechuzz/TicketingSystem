@@ -9,10 +9,11 @@ from app.services import booking_service, payment_service
 from app.domain.booking.schemas import OrderDetailsDTO, TicketHolderReadDTO, TicketHolderUpsertDTO, InvoiceRequestDTO, \
     InvoiceReadDTO, InvoiceUpsertDTO
 
-router = APIRouter(prefix="/users/me/cart", tags=["cart"])
 
+router = APIRouter(prefix="/users/me/cart", tags=["cart"])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
 user_dependency = Annotated[User, Depends(get_current_user_with_roles("CUSTOMER"))]
+
 
 @router.get(
     "",
@@ -41,8 +42,8 @@ async def remove_item(ticket_instance_id: int, db: db_dependency, user: user_dep
 )
 async def upsert_ticket_holder(
         ticket_instance_id: int,
-        db: db_dependency,
         schema: TicketHolderUpsertDTO,
+        db: db_dependency,
         user: user_dependency
 ):
     ticket_holder = await booking_service.upsert_ticket_holder(db, ticket_instance_id, schema, user)
@@ -53,7 +54,7 @@ async def upsert_ticket_holder(
     "/invoice-request",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def set_invoice_requested(db: db_dependency, schema: InvoiceRequestDTO, user: user_dependency):
+async def set_invoice_requested(schema: InvoiceRequestDTO, db: db_dependency, user: user_dependency):
     await booking_service.set_invoice_requested(db, schema, user)
 
 
@@ -63,7 +64,7 @@ async def set_invoice_requested(db: db_dependency, schema: InvoiceRequestDTO, us
     response_model=InvoiceReadDTO,
     response_model_exclude_none=True
 )
-async def upsert_invoice(db: db_dependency, schema: InvoiceUpsertDTO, user: user_dependency):
+async def upsert_invoice(schema: InvoiceUpsertDTO, db: db_dependency, user: user_dependency):
     invoice = await booking_service.upsert_invoice(db, schema, user)
     return invoice
 

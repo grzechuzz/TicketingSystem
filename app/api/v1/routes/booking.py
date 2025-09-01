@@ -7,9 +7,10 @@ from app.domain.users.models import User
 from app.services import booking_service
 from app.domain.booking.schemas import ReserveTicketRequestDTO, ReserveTicketReadDTO
 
-router = APIRouter(prefix="/events/{event_id}/reservations", tags=["booking"])
 
+router = APIRouter(prefix="/events/{event_id}/reservations", tags=["booking"])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
+
 
 @router.post(
     "",
@@ -18,11 +19,11 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
     response_model_exclude_none=True,
 )
 async def reserve_ticket(
-    event_id: int,
-    schema: ReserveTicketRequestDTO,
-    db: db_dependency,
-    user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER", "ADMIN"))],
-    response: Response,
+        event_id: int,
+        schema: ReserveTicketRequestDTO,
+        db: db_dependency,
+        user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER", "ADMIN"))],
+        response: Response,
 ):
     order, ticket_instance = await booking_service.reserve_ticket(
         db=db,

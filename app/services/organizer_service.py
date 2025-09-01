@@ -5,20 +5,21 @@ from app.domain.organizers import crud
 from app.domain.organizers.schemas import OrganizerCreateDTO, OrganizerPutDTO
 from app.domain.users.models import User
 
+
 async def get_organizer(db: AsyncSession, organizer_id: int) -> Organizer:
-    organizer = await crud.get_by_id(db, organizer_id)
+    organizer = await crud.get_organizer_by_id(db, organizer_id)
     if not organizer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organizer not found")
     return organizer
 
 
 async def list_organizers(db: AsyncSession) -> list[Organizer]:
-    return await crud.list_all(db)
+    return await crud.list_all_organizers(db)
 
 
 async def create_organizer(db: AsyncSession, schema: OrganizerCreateDTO) -> Organizer:
     data = schema.model_dump(exclude_none=True)
-    organizer = await crud.create(db, data)
+    organizer = await crud.create_organizer(db, data)
     await db.flush()
     return organizer
 
@@ -44,10 +45,10 @@ async def update_organizer(
 ) -> Organizer:
     organizer = await get_authorized_organizer(db, organizer_id, current_user)
     data = schema.model_dump(exclude_none=True)
-    organizer = await crud.update(organizer, data)
+    organizer = await crud.update_organizer(organizer, data)
     return organizer
 
 
 async def delete_organizer(db: AsyncSession, organizer_id: int) -> None:
     organizer = await get_organizer(db, organizer_id)
-    await crud.delete(db, organizer)
+    await crud.delete_organizer(db, organizer)
