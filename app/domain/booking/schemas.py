@@ -124,10 +124,44 @@ class InvoiceUpsertDTO(BaseModel):
         return self
 
 
+class InvoiceLineDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    event_name: str
+    ticket_type_name: str
+    quantity: int
+    vat_rate: Decimal
+    unit_price_net: Decimal
+    unit_price_gross: Decimal
+    line_net: Decimal
+    line_vat: Decimal
+    line_gross: Decimal
+
+
+class InvoiceListItemDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra='forbid')
+
+    id: int
+    invoice_number: str | None
+    order_id: int
+    issued_at: datetime | None
+    items_count: int
+    total_net: Decimal
+    total_vat: Decimal
+    total_gross: Decimal
+
+
+class AdminInvoiceListItemDTO(InvoiceListItemDTO):
+    user_id: int
+    user_email: EmailStr
+
+
 class InvoiceReadDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: int
+    invoice_number: str | None
+    currency_code: str
     invoice_type: InvoiceType
     full_name: str | None
     company_name: str | None
@@ -137,13 +171,21 @@ class InvoiceReadDTO(BaseModel):
     city: str
     country_code: str
     created_at: datetime
+    issued_at: datetime | None
 
 
 class InvoiceDetailsDTO(InvoiceReadDTO):
     order_id: int
+    items: list[InvoiceLineDTO]
     total_gross: Decimal
     total_net: Decimal
     total_vat: Decimal
+
+
+class InvoiceRequestDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    invoice_requested: bool
 
 
 class TicketHolderUpsertDTO(BaseModel):
@@ -179,10 +221,33 @@ class TicketHolderPublicDTO(BaseModel):
     identification_suffix: str
 
 
-class InvoiceRequestDTO(BaseModel):
+class TicketHolderPrivateDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid', from_attributes=True)
+
+    id: int
+    first_name: str
+    last_name: str
+    identification_number: str
+
+
+class UserTicketsQueryDTO(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    invoice_requested: bool
+    status: TicketStatus | None = None
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+
+
+class OrganizerTicketsQueryDTO(UserTicketsQueryDTO):
+    event_id: int | None = Field(None, ge=1)
+    code: str | None = None
+    ticket_id: int | None = Field(None, ge=1)
+    email: EmailStr | None = None
+
+
+class AdminTicketsQueryDTO(OrganizerTicketsQueryDTO):
+    user_id: int | None = Field(None, ge=1)
+    organizer_id: int | None = Field(None, ge=1)
 
 
 class TicketReadItemDTO(BaseModel):
@@ -202,7 +267,20 @@ class TicketReadItemDTO(BaseModel):
     seat: int | None
     ticket_type_name: str
     price_gross: Decimal
-    holder: TicketHolderPublicDTO | None = None
+    holder: TicketHolderPublicDTO | TicketHolderPrivateDTO | None = None
+
+
+class UserInvoicesQueryDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+
+
+class AdminInvoicesQueryDTO(UserInvoicesQueryDTO):
+    user_id: int | None = None
+    email: EmailStr | None = None
+    invoice_type: InvoiceType | None = None
 
 
 class AdminOrderDetailsDTO(OrderDetailsDTO):
@@ -210,4 +288,3 @@ class AdminOrderDetailsDTO(OrderDetailsDTO):
 
     user_id: int
     user_email: EmailStr
-    invoice: InvoiceDetailsDTO | None = None
