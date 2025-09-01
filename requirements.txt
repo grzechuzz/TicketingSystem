@@ -13,3 +13,4 @@ pytest-asyncio
 httpx
 python-multipart
 phonenumbers
+tzdata
