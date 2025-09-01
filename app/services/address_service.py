@@ -20,6 +20,7 @@ async def list_addresses(db: AsyncSession) -> list[Address]:
 async def create_address(db: AsyncSession, schema: AddressCreateDTO) -> Address:
     data = schema.model_dump(exclude_none=True)
     address = await crud.create(db, data)
+    await db.flush()
     return address
 
 

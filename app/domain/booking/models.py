@@ -1,10 +1,12 @@
+import uuid
+
 from app.core.database import Base
 from enum import Enum
 from decimal import Decimal
 from datetime import datetime, date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Identity, text, Text, ForeignKey, Numeric, TIMESTAMP, func, Enum as SQLEnum, UniqueConstraint, \
-    CheckConstraint, Boolean, Date, Index
+    CheckConstraint, Boolean, Date, Index, String
 
 
 class OrderStatus(str, Enum):
@@ -111,7 +113,7 @@ class Ticket(Base):
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
     ticket_instance_id: Mapped[int] = mapped_column(ForeignKey("ticket_instances.id", ondelete="RESTRICT"),
                                                     nullable=False, unique=True)
-    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True, default=lambda: uuid.uuid4().hex)
     status: Mapped[TicketStatus] = mapped_column(SQLEnum(TicketStatus, name="ticket_status"),
                                                  nullable=False, server_default=TicketStatus.ACTIVE.value)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
@@ -123,6 +125,8 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    invoice_number: Mapped[str | None] = mapped_column(Text, unique=True, index=True, nullable=True)
+    currency_code: Mapped[str] = mapped_column(String(3), nullable=False, server_default="PLN")
     order_id: Mapped[int] = mapped_column(
         ForeignKey("orders.id", ondelete="RESTRICT"),
         nullable=False,
@@ -139,5 +143,6 @@ class Invoice(Base):
     city: Mapped[str] = mapped_column(Text, nullable=False)
     country_code: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     order: Mapped["Order"] = relationship(back_populates="invoice", lazy="selectin", uselist=False)

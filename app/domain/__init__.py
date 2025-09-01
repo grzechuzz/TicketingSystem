@@ -8,9 +8,10 @@ from .pricing.models import TicketType, EventTicketType
 from .allocation.models import EventSector
 from .payments.models import Payment, PaymentMethod
 from .booking.models import TicketHolder, TicketInstance, Order, Ticket
+from .booking.counters import invoice_counters
 
 __all__ = (
     "user_roles", "organizers_users", "Address", "Organizer", "User", "Role", "Venue", "Seat", "Sector",
     "Event", "EventSector", "TicketType", "EventTicketType", "TicketHolder", "TicketInstance", "PaymentMethod",
-    "Payment", "Order", "Ticket"
+    "Payment", "Order", "Ticket", "invoice_counters"
 )

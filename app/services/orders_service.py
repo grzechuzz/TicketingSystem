@@ -4,15 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.core.pagination import PageDTO
 from app.domain.users.models import User
-from app.domain.booking.models import Order, TicketInstance, Ticket, TicketStatus, Invoice, TicketHolder
-from app.domain.venues.models import Venue
-from app.domain.allocation.models import EventSector
-from app.domain.pricing.models import EventTicketType
-from app.domain.events.models import Event
-from app.domain.venues.models import Sector, Seat
+from app.domain.booking.models import Order, TicketInstance, Ticket, TicketStatus, TicketHolder
 from app.domain.payments.models import Payment, PaymentStatus
 from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, TicketReadItemDTO, \
-    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO, InvoiceDetailsDTO, TicketHolderPublicDTO
+    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO, TicketHolderPublicDTO
 from app.domain.payments.schemas import PaymentInOrderDTO, PaymentMethodReadDTO
 
 
@@ -58,26 +53,6 @@ def _to_order_details(order: Order, payment_dto: PaymentInOrderDTO | None) -> Or
         created_at=order.created_at,
         items=list(order.ticket_instances),
         payment=payment_dto
-    )
-
-
-def _to_invoice_details(invoice: Invoice, order: Order) -> InvoiceDetailsDTO:
-    net, vat, gross = _calc_totals_from_tickets(order.ticket_instances)
-    return InvoiceDetailsDTO(
-        id=invoice.id,
-        invoice_type=invoice.invoice_type,
-        full_name=getattr(invoice, 'full_name', None),
-        company_name=getattr(invoice, 'company_name', None),
-        tax_id=getattr(invoice, 'tax_id', None),
-        street=invoice.street,
-        postal_code=invoice.postal_code,
-        city=invoice.city,
-        country_code=invoice.country_code,
-        created_at=invoice.created_at,
-        order_id=invoice.order_id,
-        total_gross=gross,
-        total_net=net,
-        total_vat=vat
     )
 
 
@@ -129,76 +104,6 @@ async def get_user_order(db: AsyncSession, user: User, order_id: int) -> OrderDe
     payment_dto = _to_payment_in_order(payment) if payment else None
 
     return _to_order_details(order, payment_dto)
-
-
-async def list_user_active_tickets(db: AsyncSession, user: User) -> list[TicketReadItemDTO]:
-    rows = await db.execute(
-        select(
-            Ticket.id,
-            Ticket.code,
-            Ticket.status,
-            Ticket.created_at,
-            Event.id.label('event_id'),
-            Event.name.label('event_name'),
-            Event.event_start,
-            Venue.name.label("venue_name"),
-            Sector.is_ga,
-            Sector.name.label('sector_name'),
-            Seat.row,
-            Seat.number.label("seat"),
-            TicketInstance.ticket_type_name_snapshot.label("ticket_type_name"),
-            TicketInstance.price_gross_snapshot.label("price_gross"),
-            TicketHolder.id.label('holder_id'),
-            TicketHolder.first_name,
-            TicketHolder.last_name,
-            TicketHolder.identification_number
-        )
-        .select_from(Ticket)
-        .join(TicketInstance)
-        .join(Order)
-        .join(Event)
-        .join(Venue, Venue.id == Event.venue_id)
-        .join(EventTicketType)
-        .join(EventSector)
-        .join(Sector)
-        .outerjoin(Seat, Seat.id == TicketInstance.seat_id)
-        .outerjoin(TicketHolder, TicketHolder.ticket_instance_id == TicketInstance.id)
-        .where(Order.user_id == user.id, Ticket.status == TicketStatus.ACTIVE)
-        .order_by(desc(Ticket.created_at), Ticket.id)
-    )
-
-    items = []
-    for r in rows.all():
-        holder = None
-        if r.holder_id is not None:
-            suffix = (r.identification_number or "")[-4:]
-            holder = TicketHolderPublicDTO(
-                id=r.holder_id,
-                first_name=r.first_name,
-                last_name=r.last_name,
-                identification_suffix=suffix
-            )
-        items.append(
-            TicketReadItemDTO(
-                id=r.id,
-                code=r.code,
-                status=r.status,
-                created_at=r.created_at,
-                event_id=r.event_id,
-                event_name=r.event_name,
-                event_start=r.event_start,
-                venue_name=r.venue_name,
-                is_ga=r.is_ga,
-                sector_name=r.sector_name,
-                row=r.row,
-                seat=r.seat,
-                ticket_type_name=r.ticket_type_name,
-                price_gross=r.price_gross,
-                holder=holder
-            )
-        )
-
-    return items
 
 
 async def list_orders_admin(db: AsyncSession, query: AdminOrdersQueryDTO) -> PageDTO[AdminOrderListItemDTO]:
@@ -278,9 +183,6 @@ async def get_order_admin(db: AsyncSession, order_id: int) -> AdminOrderDetailsD
     )
     payment_dto = _to_payment_in_order(payment) if payment else None
 
-    invoice = await db.scalar(select(Invoice).where(Invoice.order_id == order.id))
-    invoice_dto = _to_invoice_details(invoice, order) if invoice else None
-
     return AdminOrderDetailsDTO(
         id=order.id,
         status=order.status,
@@ -290,6 +192,5 @@ async def get_order_admin(db: AsyncSession, order_id: int) -> AdminOrderDetailsD
         items=list(order.ticket_instances),
         payment=payment_dto,
         user_id=order.user_id,
-        user_email=user_email,
-        invoice=invoice_dto,
+        user_email=user_email
     )

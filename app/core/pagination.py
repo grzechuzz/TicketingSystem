@@ -19,4 +19,4 @@ class PageDTO(BaseModel, Generic[T]):
     @computed_field
     @property
     def has_next(self) -> bool:
-        return self.page < self.total
+        return self.page < self.pages
