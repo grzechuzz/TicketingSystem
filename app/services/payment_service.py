@@ -8,6 +8,7 @@ from app.domain.payments.models import PaymentMethod, Payment, PaymentStatus
 from app.domain.payments.schemas import PaymentMethodCreateDTO, PaymentMethodUpdateDTO, PaymentCreateDTO
 from app.domain.users.models import User
 from app.domain.booking.models import Order, OrderStatus, TicketInstance, Ticket
+from app.services.invoices_service import issue_invoice_for_order
 import uuid
 
 
@@ -25,10 +26,6 @@ def _normalize_uuid4(key: str) -> str:
     return str(u)
 
 
-async def _generate_ticket_code() -> str:
-    return uuid.uuid4().hex
-
-
 async def _issue_tickets(db: AsyncSession, order: Order) -> None:
     ticket_instances = await db.scalars(
         select(TicketInstance)
@@ -37,8 +34,7 @@ async def _issue_tickets(db: AsyncSession, order: Order) -> None:
         .where(Ticket.id.is_(None))
     )
     for ticket_instance in ticket_instances.all():
-        code = await _generate_ticket_code()
-        db.add(Ticket(ticket_instance_id=ticket_instance.id, code=code))
+        db.add(Ticket(ticket_instance_id=ticket_instance.id))
     await db.flush()
 
 
@@ -189,6 +185,10 @@ async def finalize_payment(
         payment.status = PaymentStatus.COMPLETED
         payment.paid_at = now
         order.status = OrderStatus.COMPLETED
+
+        if order.invoice_requested and order.invoice:
+            await issue_invoice_for_order(db, order, now)
+
         await _issue_tickets(db, order)
         await db.flush()
         return payment
