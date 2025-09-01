@@ -19,6 +19,7 @@ async def list_organizers(db: AsyncSession) -> list[Organizer]:
 async def create_organizer(db: AsyncSession, schema: OrganizerCreateDTO) -> Organizer:
     data = schema.model_dump(exclude_none=True)
     organizer = await crud.create(db, data)
+    await db.flush()
     return organizer
 
 
