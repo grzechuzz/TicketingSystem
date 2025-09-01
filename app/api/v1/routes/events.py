@@ -10,9 +10,10 @@ from app.domain.users.models import User
 from app.services import event_service, event_sectors_service, event_ticket_type_service
 from app.domain.events.models import Event, EventStatus
 
-router = APIRouter(tags=["events"])
 
+router = APIRouter(tags=["events"])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
+
 
 @router.get(
     "/events",
@@ -135,11 +136,11 @@ async def get_all_event_sectors_by_event(event_id: int, db: db_dependency):
 )
 async def create_event_sector_for_event(
         event: Annotated[Event, Depends(require_event_owner)],
-        model: EventSectorCreateDTO,
+        schema: EventSectorCreateDTO,
         db: db_dependency,
         response: Response
 ):
-    event_sector = await event_sectors_service.create_event_sector(db, model, event)
+    event_sector = await event_sectors_service.create_event_sector(db, schema, event)
     response.headers["Location"] = f"/events/{event.id}/sectors/{event_sector.sector_id}"
     return event_sector
 
@@ -150,10 +151,10 @@ async def create_event_sector_for_event(
 )
 async def bulk_add_event_sectors_for_event(
         event: Annotated[Event, Depends(require_event_owner)],
-        model: EventSectorBulkCreateDTO,
+        schema: EventSectorBulkCreateDTO,
         db: db_dependency
 ):
-    await event_sectors_service.bulk_create_event_sectors(db, model, event)
+    await event_sectors_service.bulk_create_event_sectors(db, schema, event)
 
 
 @router.delete(

@@ -6,9 +6,10 @@ from app.core.dependencies import get_current_user_with_roles
 from app.domain.venues.schemas import SeatUpdateDTO, SeatReadDTO
 from typing import Annotated
 
-router = APIRouter(prefix='/seats', tags=['seats'])
 
+router = APIRouter(prefix='/seats', tags=['seats'])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
+
 
 @router.get(
     "/{seat_id}",

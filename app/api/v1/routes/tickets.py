@@ -35,8 +35,8 @@ async def list_user_tickets(
     response_model_exclude_none=True
 )
 async def list_tickets_organizer(
-        db: db_dependency,
         organizer_id: Annotated[int, Depends(require_organizer_member)],
+        db: db_dependency,
         query: Annotated[OrganizerTicketsQueryDTO, Depends()]
 ):
     return await tickets_service.list_organizer_tickets(db, organizer_id, query)

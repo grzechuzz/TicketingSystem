@@ -7,19 +7,19 @@ from app.domain.users.models import User
 
 
 async def get_address(db: AsyncSession, address_id: int) -> Address:
-    address = await crud.get_by_id(db, address_id)
+    address = await crud.get_address_by_id(db, address_id)
     if not address:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Address not found")
     return address
 
 
 async def list_addresses(db: AsyncSession) -> list[Address]:
-    return await crud.list_all(db)
+    return await crud.list_all_addresses(db)
 
 
 async def create_address(db: AsyncSession, schema: AddressCreateDTO) -> Address:
     data = schema.model_dump(exclude_none=True)
-    address = await crud.create(db, data)
+    address = await crud.create_address(db, data)
     await db.flush()
     return address
 
@@ -47,5 +47,5 @@ async def get_authorized_address(db: AsyncSession, address_id: int, current_user
 async def update_address(db: AsyncSession, schema: AddressPutDTO, address_id: int, current_user: User) -> Address:
     address = await get_authorized_address(db, address_id, current_user)
     data = schema.model_dump(exclude_none=True)
-    address = await crud.update(address, data)
+    address = await crud.update_address(address, data)
     return address

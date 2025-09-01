@@ -9,9 +9,9 @@ from app.services import payment_service
 
 
 router = APIRouter(prefix="/users/me/cart/payments", tags=["payments"])
-
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
 user_dependency = Annotated[User, Depends(get_current_user_with_roles("CUSTOMER"))]
+
 
 @router.post(
     "/start",

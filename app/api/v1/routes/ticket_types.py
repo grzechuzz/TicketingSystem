@@ -6,8 +6,8 @@ from app.domain.pricing.schemas import TicketTypeReadDTO, TicketTypeCreateDTO
 from app.core.dependencies import get_current_user_with_roles
 from app.services import ticket_type_service
 
-router = APIRouter(prefix="/ticket-types", tags=["ticket-types"])
 
+router = APIRouter(prefix="/ticket-types", tags=["ticket-types"])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
 
 

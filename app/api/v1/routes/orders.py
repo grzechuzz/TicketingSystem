@@ -3,14 +3,16 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.domain.users.models import User
-from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, TicketReadItemDTO, \
+from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, \
     AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO
 from app.core.pagination import PageDTO
 from app.core.dependencies import get_current_user_with_roles
 from app.services import orders_service
 
+
 router = APIRouter(tags=["orders"])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
+
 
 @router.get(
     "/users/me/orders",
@@ -33,8 +35,8 @@ async def list_user_orders(
     status_code=status.HTTP_200_OK
 )
 async def get_user_order(
-        db: db_dependency,
         order_id: int,
+        db: db_dependency,
         user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER"))]
 ):
     return await orders_service.get_user_order(db, user, order_id)
@@ -58,5 +60,5 @@ async def list_orders_admin(db: db_dependency, query: Annotated[AdminOrdersQuery
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
-async def get_order_admin(db: db_dependency, order_id: int):
+async def get_order_admin(order_id: int, db: db_dependency):
     return await orders_service.get_order_admin(db, order_id)

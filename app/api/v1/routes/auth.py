@@ -7,9 +7,10 @@ from app.domain.users.schemas import UserCreateDTO, UserReadDTO, Token
 from app.services.user_service import create_user, login_user
 from typing import Annotated
 
-router = APIRouter(prefix='/auth', tags=['auth'])
 
+router = APIRouter(prefix='/auth', tags=['auth'])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
+
 
 @router.post(
     '/register',
@@ -21,6 +22,7 @@ async def register(db: db_dependency, model: UserCreateDTO, response: Response):
     user = await create_user(model, db)
     response.headers['Location'] = f"api/v1/users/{user.id}"
     return UserReadDTO.model_validate(user)
+
 
 @router.post("/login", response_model=Token)
 async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):

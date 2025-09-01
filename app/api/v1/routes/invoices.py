@@ -35,8 +35,8 @@ async def list_user_invoices(
     response_model_exclude_none=True
 )
 async def get_user_invoice(
-        db: db_dependency,
         invoice_id: int,
+        db: db_dependency,
         user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER"))],
 ):
     return await invoices_service.get_user_invoice_details(db, user, invoice_id)
@@ -61,7 +61,7 @@ async def list_invoices_admin(db: db_dependency, query: Annotated[AdminInvoicesQ
     dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
 async def get_invoice_admin(
-        db: db_dependency,
-        invoice_id: int
+        invoice_id: int,
+        db: db_dependency
 ):
     return await invoices_service.get_invoice_details_admin(db, invoice_id)

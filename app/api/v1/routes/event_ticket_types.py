@@ -9,7 +9,6 @@ from app.services import event_ticket_type_service
 
 
 router = APIRouter(prefix="/event-ticket-types", tags=["event-ticket-types"])
-
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
 
 
