@@ -1,3 +1,5 @@
+import uuid
+
 from app.core.database import Base
 from enum import Enum
 from decimal import Decimal
@@ -111,7 +113,7 @@ class Ticket(Base):
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
     ticket_instance_id: Mapped[int] = mapped_column(ForeignKey("ticket_instances.id", ondelete="RESTRICT"),
                                                     nullable=False, unique=True)
-    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True, default=lambda: uuid.uuid4().hex)
     status: Mapped[TicketStatus] = mapped_column(SQLEnum(TicketStatus, name="ticket_status"),
                                                  nullable=False, server_default=TicketStatus.ACTIVE.value)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
