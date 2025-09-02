@@ -3,14 +3,10 @@ uvicorn[standard]
 sqlalchemy[asyncio]>=2.0
 asyncpg
 alembic
-pydantic
 pydantic[email]
 python-dotenv
 argon2-cffi
 python-jose[cryptography]
-pytest
-pytest-asyncio
-httpx
 python-multipart
 phonenumbers
 tzdata
