@@ -1,0 +1,9 @@
+pytest
+pytest-asyncio
+pytest-cov
+pytest-mock
+time-machine
+faker
+factory_boy
+httpx
+testcontainers[postgresql]
