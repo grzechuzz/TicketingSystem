@@ -33,7 +33,7 @@ async def reserve_ticket(
         seat_id=schema.seat_id,
     )
 
-    response.headers["Location"] = f"/orders/{order.id}"
+    response.headers["Location"] = f"/users/me/orders/{order.id}"
 
     return ReserveTicketReadDTO(
         order_id=order.id,
