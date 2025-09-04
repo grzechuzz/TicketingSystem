@@ -14,7 +14,7 @@ class Venue(Base):
                                             unique=True,
                                             nullable=False)
 
-    address: Mapped['Address'] = relationship(back_populates="venues", lazy='selectin')
+    address: Mapped['Address'] = relationship(back_populates="venue", lazy='selectin')
     sectors: Mapped[list['Sector']] = relationship(back_populates="venue", lazy='selectin')
     events: Mapped[list['Event']] = relationship(back_populates="venue", lazy='selectin')
 

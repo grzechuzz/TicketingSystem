@@ -33,7 +33,10 @@ class Order(Base):
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     total_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, server_default="0")
-    reserved_until: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True, index=True)
+    reserved_until: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True),
+                                                     nullable=False,
+                                                     index=True,
+                                                     server_default=text("timezone('utc', now()) + interval '20 minutes'"))
     status: Mapped[OrderStatus] = mapped_column(SQLEnum(OrderStatus, name="order_status"),
                                                 nullable=False, server_default=OrderStatus.PENDING.value)
     invoice_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))

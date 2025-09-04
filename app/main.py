@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.api.v1.routes import (auth, addresses, organizers, venues, sectors, events, seats, ticket_types,
                                event_ticket_types, booking, cart, payment_methods, payments, orders, invoices,
-                               tickets)
+                               tickets, users, admin_maintenance)
 
 app = FastAPI()
 app.include_router(auth.router)
@@ -20,3 +20,5 @@ app.include_router(payments.router)
 app.include_router(orders.router)
 app.include_router(invoices.router)
 app.include_router(tickets.router)
+app.include_router(users.router)
+app.include_router(admin_maintenance.router)

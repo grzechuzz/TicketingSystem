@@ -20,7 +20,7 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
 )
 async def register(db: db_dependency, model: UserCreateDTO, response: Response):
     user = await create_user(model, db)
-    response.headers['Location'] = f"api/v1/users/{user.id}"
+    response.headers['Location'] = f"/users/me"
     return UserReadDTO.model_validate(user)
 
 

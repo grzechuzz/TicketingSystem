@@ -36,7 +36,7 @@ async def get_authorized_address(db: AsyncSession, address_id: int, current_user
         if not org_ids.intersection(user_org_ids):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-        if address.venues:
+        if address.venue:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
         return address

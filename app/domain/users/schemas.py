@@ -74,6 +74,6 @@ class TokenPayload(BaseModel):
 
     sub: str
     roles: list[str]
-    iat: datetime
-    exp: datetime
+    iat: int
+    exp: int
 
