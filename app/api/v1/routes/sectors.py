@@ -46,7 +46,7 @@ async def create_seat_for_sector(sector_id: int, schema: SeatCreateDTO, db: db_d
 
 @router.post(
     "/{sector_id}/seats/bulk",
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(get_current_user_with_roles("ADMIN"))],
 )
 async def bulk_add_seats_for_sector(sector_id: int, schema: SeatBulkCreateDTO, db: db_dependency):
