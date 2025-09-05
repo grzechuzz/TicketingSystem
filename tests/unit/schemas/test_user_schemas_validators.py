@@ -54,14 +54,18 @@ def test_phone_valid_e164_passes():
     assert dto.phone_number == "+48123456789"
 
 
+def test_phone_formats_with_space_hyphens_are_normalized():
+    dto = UserCreateDTO(**create_payload(phone_number="+48 123-456-789"))
+    assert dto.phone_number == "+48123456789"
+
+
 @pytest.mark.parametrize("bad_phone_number", [
     "123456789",
-    "+48 123 456 789",
-    "+48-123-456-789",
-    "+48ABCDEF",
+    "+999123456",
+    "+48ABCDEFGH",
     "+" + "1"*16,
 ])
 def test_phone_invalid_formats_raise_validation_error(bad_phone_number):
     with pytest.raises(ValidationError) as e:
         UserCreateDTO(**create_payload(phone_number=bad_phone_number))
-    assert "Wrong phone number format" in str(e.value)
+    assert "Invalid phone number" in str(e.value)
