@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, SecretStr, model_validator
+from phonenumbers import parse, is_valid_number, format_number, PhoneNumberFormat, NumberParseException
 from datetime import date, datetime
 from typing import Literal
 import re
@@ -36,12 +37,15 @@ class UserCreateDTO(BaseModel):
 
     @field_validator("phone_number")
     def check_phone_number(cls, v: str | None) -> str | None:
-        if v is None or v == "":
+        if v is None or v.strip() == "":
             return None
-        pattern = re.compile(r"^\+\d{1,15}$")
-        if not pattern.match(v):
-            raise ValueError("Wrong phone number format")
-        return v
+        try:
+            num = parse(v, None)
+        except NumberParseException:
+            raise ValueError('Invalid phone number')
+        if not is_valid_number(num):
+            raise ValueError('Invalid phone number')
+        return format_number(num, PhoneNumberFormat.E164)
 
     @model_validator(mode="after")
     def passwords_match(self):
