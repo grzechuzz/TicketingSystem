@@ -197,8 +197,7 @@ async def reserve_ticket(
         db,
         user.id,
         OrderStatus.PENDING,
-        for_update=True,
-        not_found_msg="Order not found or not in PENDING status"
+        for_update=True
     )
 
     # Part 4 - check ticket limits per user for specific event
