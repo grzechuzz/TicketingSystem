@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException, status
 from app.services import address_service
-from tests.helper import create_address, create_role, create_user, create_organizer
+from tests.helper import create_role
 
 
 @pytest.mark.asyncio
@@ -68,11 +68,11 @@ async def test_create_address_returns_address(mocker):
 
 @pytest.mark.asyncio
 async def test_get_authorized_address_admin_returns_address(mocker):
-    address = create_address(mocker)
+    address = mocker.Mock()
     db = mocker.Mock()
     role1 = create_role(mocker, "ADMIN")
     role2 = create_role(mocker, "ORGANIZER")
-    current_user = create_user(mocker, [role1, role2])
+    current_user = mocker.Mock(roles=[role1, role2], organizers=None)
     mocker.patch("app.services.address_service.get_address", new=mocker.AsyncMock(return_value=address))
 
     result = await address_service.get_authorized_address(db, 1, current_user)
@@ -82,13 +82,13 @@ async def test_get_authorized_address_admin_returns_address(mocker):
 
 @pytest.mark.asyncio
 async def test_get_authorized_address_organizer_returns_address(mocker):
-    organizer1 = create_organizer(mocker, 1)
-    organizer2 = create_organizer(mocker, 2)
-    address = create_address(mocker, venue=None, organizers=[organizer1, organizer2])
+    organizer1 = mocker.Mock(id=1)
+    organizer2 = mocker.Mock(id=2)
+    address = mocker.Mock(venue=None, organizers=[organizer1, organizer2])
     mocker.patch("app.services.address_service.get_address", new=mocker.AsyncMock(return_value=address))
     db = mocker.Mock()
     role = create_role(mocker, "ORGANIZER")
-    current_user = create_user(mocker, [role], [organizer1])
+    current_user = mocker.Mock(roles=[role], organizers=[organizer1])
 
     result = await address_service.get_authorized_address(db, 1, current_user)
 
@@ -97,13 +97,13 @@ async def test_get_authorized_address_organizer_returns_address(mocker):
 
 @pytest.mark.asyncio
 async def test_get_authorized_address_empty_intersection_addresses_organizers_raises_403(mocker):
-    organizer1 = create_organizer(mocker, 1)
-    organizer2 = create_organizer(mocker, 2)
-    address = create_address(mocker, venue=None, organizers=[organizer1])
+    organizer1 = mocker.Mock(id=1)
+    organizer2 = mocker.Mock(id=2)
+    address = mocker.Mock(venue=None, organizers=[organizer1])
     mocker.patch("app.services.address_service.get_address", new=mocker.AsyncMock(return_value=address))
     db = mocker.Mock()
     role = create_role(mocker, "ORGANIZER")
-    current_user = create_user(mocker, [role], [organizer2])
+    current_user = mocker.Mock(roles=[role], organizers=[organizer2])
 
     with pytest.raises(HTTPException) as e:
         await address_service.get_authorized_address(db, 1, current_user)
@@ -113,11 +113,11 @@ async def test_get_authorized_address_empty_intersection_addresses_organizers_ra
 
 @pytest.mark.asyncio
 async def test_get_authorized_address_address_already_has_venue_raises_403(mocker):
-    organizer1 = create_organizer(mocker, 1)
-    address = create_address(mocker, venue=mocker.Mock(), organizers=[organizer1])
+    organizer1 = mocker.Mock(id=1)
+    address = mocker.Mock(venue=mocker.Mock(), organizers=[organizer1])
     mocker.patch("app.services.address_service.get_address", new=mocker.AsyncMock(return_value=address))
     role = create_role(mocker, "ORGANIZER")
-    current_user = create_user(mocker, [role], [organizer1])
+    current_user = mocker.Mock(roles=[role], organizers=[organizer1])
     db = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
@@ -133,7 +133,7 @@ async def test_update_address_returns_address(mocker):
     dto = mocker.Mock()
     dto.model_dump.return_value = {"test": "test"}
     mocker.patch("app.services.address_service.crud.update_address", new=mocker.AsyncMock(return_value=address))
-    current_user = create_user(mocker)
+    current_user = mocker.Mock()
     db = mocker.Mock()
 
     result = await address_service.update_address(db, dto, 1, current_user)
