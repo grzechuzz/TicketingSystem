@@ -11,7 +11,7 @@ class Organizer(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     phone_number: Mapped[str] = mapped_column(Text, nullable=False)
-    address_id: Mapped[int | None] = mapped_column(ForeignKey('addresses.id', ondelete='SET NULL'), nullable=True)
+    address_id: Mapped[int] = mapped_column(ForeignKey('addresses.id', ondelete='RESTRICT'), nullable=False)
     vat_number: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)
     registration_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
     iban: Mapped[str | None] = mapped_column(String(34), nullable=True, unique=True)
