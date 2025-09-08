@@ -56,6 +56,15 @@ def _to_order_details(order: Order, payment_dto: PaymentInOrderDTO | None) -> Or
     )
 
 
+def _ticket_instance_count_subquery():
+    return (
+        select(func.count(TicketInstance.id))
+        .where(TicketInstance.order_id == Order.id)
+        .correlate(Order)
+        .scalar_subquery()
+    )
+
+
 async def list_user_orders(
         db: AsyncSession,
         user: User,
@@ -67,12 +76,7 @@ async def list_user_orders(
 
     total = await db.scalar(select(func.count()).select_from(Order).where(*where))
 
-    ti_count = (
-        select(func.count(TicketInstance.id))
-        .where(TicketInstance.order_id == Order.id)
-        .correlate(Order)
-        .scalar_subquery()
-    )
+    ti_count = _ticket_instance_count_subquery()
 
     rows = await db.execute(
         select(Order, ti_count.label("items_count"))
@@ -121,12 +125,7 @@ async def list_orders_admin(db: AsyncSession, query: AdminOrdersQueryDTO) -> Pag
 
     total = await db.scalar(select(func.count()).select_from(Order).where(*where))
 
-    ti_count = (
-        select(func.count(TicketInstance.id))
-        .where(TicketInstance.order_id == Order.id)
-        .correlate(Order)
-        .scalar_subquery()
-    )
+    ti_count = _ticket_instance_count_subquery()
 
     rows = await db.execute(
         select(
