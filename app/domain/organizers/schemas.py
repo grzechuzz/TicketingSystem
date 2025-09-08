@@ -10,6 +10,7 @@ class OrganizerCreateDTO(BaseModel):
     registration_number: str | None = Field(default=None, min_length=5, max_length=40, pattern=r"^[A-Z0-9]+$")
     iban: str | None = Field(default=None, min_length=15, max_length=34, pattern=r"^[A-Z]{2}[0-9A-Z]{13,32}$")
     country_code: str = Field(min_length=2, max_length=2, pattern="^[A-Z]{2}$")
+    address_id: int
 
     @model_validator(mode='before')
     def validate_phone_and_region(cls, data: dict) -> dict:
@@ -42,6 +43,7 @@ class OrganizerReadDTO(BaseModel):
     registration_number: str
     iban: str
     country_code: str
+    address_id: int
     created_at: datetime
 
 
