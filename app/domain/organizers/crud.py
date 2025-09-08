@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain import Organizer
 
@@ -9,10 +9,11 @@ async def get_organizer_by_id(db: AsyncSession, organizer_id: int) -> Organizer 
     return result.scalars().first()
 
 
-async def list_all_organizers(db: AsyncSession) -> list[Organizer]:
-    stmt = select(Organizer)
-    result = await db.execute(stmt)
-    return result.scalars().all()
+async def list_all_organizers(db: AsyncSession, page: int, page_size: int) -> tuple[list[Organizer], int]:
+    total = await db.scalar(select(func.count()).select_from(Organizer))
+    stmt = select(Organizer).order_by(Organizer.id).limit(page_size).offset((page - 1) * page_size)
+    result = await db.scalars(stmt)
+    return list(result), int(total or 0)
 
 
 async def create_organizer(db: AsyncSession, data: dict) -> Organizer:
