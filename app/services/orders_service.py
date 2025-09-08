@@ -4,10 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.core.pagination import PageDTO
 from app.domain.users.models import User
-from app.domain.booking.models import Order, TicketInstance, Ticket, TicketStatus, TicketHolder
+from app.domain.booking.models import Order, TicketInstance
 from app.domain.payments.models import Payment, PaymentStatus
-from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, TicketReadItemDTO, \
-    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO, TicketHolderPublicDTO
+from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, \
+    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO
 from app.domain.payments.schemas import PaymentInOrderDTO, PaymentMethodReadDTO
 
 
