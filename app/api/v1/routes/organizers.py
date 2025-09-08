@@ -1,8 +1,9 @@
 from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.organizers.schemas import OrganizerCreateDTO, OrganizerReadDTO, OrganizerPutDTO
+from app.domain.organizers.schemas import OrganizerCreateDTO, OrganizerReadDTO, OrganizerPutDTO, OrganizersQueryDTO
 from app.domain.users.models import User
 from app.core.dependencies import get_db, get_current_user_with_roles
+from app.core.pagination import PageDTO
 from app.services import organizer_service
 from typing import Annotated
 
@@ -27,12 +28,12 @@ async def create_organizer(schema: OrganizerCreateDTO, db: db_dependency, respon
 @router.get(
     "",
     status_code=status.HTTP_200_OK,
-    response_model=list[OrganizerReadDTO],
+    response_model=PageDTO[OrganizerReadDTO],
     response_model_exclude_none=True,
     dependencies=[Depends(get_current_user_with_roles("ADMIN", "ORGANIZER", "CUSTOMER"))]
 )
-async def list_organizers(db: db_dependency):
-    organizers = await organizer_service.list_organizers(db)
+async def list_organizers(db: db_dependency, query: Annotated[OrganizersQueryDTO, Depends()]):
+    organizers = await organizer_service.list_organizers(db, query)
     return organizers
 
 
