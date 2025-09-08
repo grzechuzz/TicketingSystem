@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Address
 
@@ -9,10 +9,11 @@ async def get_address_by_id(db: AsyncSession, address_id: int) -> Address | None
     return result.scalars().first()
 
 
-async def list_all_addresses(db: AsyncSession) -> list[Address]:
-    stmt = select(Address)
-    result = await db.execute(stmt)
-    return result.scalars().all()
+async def list_all_addresses(db: AsyncSession, page: int, page_size: int) -> tuple[list[Address], int]:
+    total = await db.scalar(select(func.count()).select_from(Address))
+    stmt = select(Address).order_by(Address.id).limit(page_size).offset((page - 1) * page_size)
+    result = await db.scalars(stmt)
+    return list(result), int(total or 0)
 
 
 async def create_address(db: AsyncSession, data: dict) -> Address:
