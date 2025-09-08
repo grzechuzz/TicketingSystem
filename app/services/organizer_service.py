@@ -1,8 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.pagination import PageDTO
 from app.domain import Organizer
 from app.domain.organizers import crud
-from app.domain.organizers.schemas import OrganizerCreateDTO, OrganizerPutDTO
+from app.domain.organizers.schemas import OrganizerCreateDTO, OrganizerPutDTO, OrganizerReadDTO, OrganizersQueryDTO
 from app.domain.users.models import User
 
 
@@ -13,8 +15,17 @@ async def get_organizer(db: AsyncSession, organizer_id: int) -> Organizer:
     return organizer
 
 
-async def list_organizers(db: AsyncSession) -> list[Organizer]:
-    return await crud.list_all_organizers(db)
+async def list_organizers(db: AsyncSession, query: OrganizersQueryDTO) -> PageDTO[OrganizerReadDTO]:
+    organizers, total = await crud.list_all_organizers(db, query.page, query.page_size)
+
+    items = [OrganizerReadDTO.model_validate(organizer) for organizer in organizers]
+
+    return PageDTO(
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size
+    )
 
 
 async def create_organizer(db: AsyncSession, schema: OrganizerCreateDTO) -> Organizer:
