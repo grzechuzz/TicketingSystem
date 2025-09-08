@@ -3,47 +3,7 @@ from fastapi import HTTPException, status
 from jose import JWTError
 from app.core import dependencies
 from sqlalchemy import Select
-
-
-def create_db(mocker, value):
-    fake_scalars = mocker.Mock()
-    fake_scalars.first.return_value = value
-    fake_result = mocker.Mock()
-    fake_result.scalars.return_value = fake_scalars
-    db = mocker.Mock()
-    db.execute = mocker.AsyncMock(return_value=fake_result)
-    return db, fake_result, fake_scalars
-
-
-def create_role(mocker, name: str):
-    role = mocker.Mock()
-    role.name = name
-    return role
-
-
-def create_organizer(mocker, organizer_id: int):
-    organizer = mocker.Mock()
-    organizer.id = organizer_id
-    return organizer
-
-
-def create_event(mocker, organizer_id: int):
-    event = mocker.Mock()
-    event.organizer_id = organizer_id
-    return event
-
-
-def create_user(mocker, roles=None, organizers=None):
-    user = mocker.Mock()
-    user.roles = roles
-    user.organizers = organizers
-    return user
-
-
-def create_event_ticket_type(mocker, event_sector_event_id: int):
-    event_ticket_type = mocker.Mock()
-    event_ticket_type.event_sector.event_id = event_sector_event_id
-    return event_ticket_type
+from tests.helper import create_role, create_db
 
 
 @pytest.mark.asyncio
@@ -87,7 +47,7 @@ async def test_get_token_payload_invalid_payload_raises_401(mocker):
 async def test_get_current_user_with_roles_when_roles_intersect_and_user_found(mocker):
     dependency = dependencies.get_current_user_with_roles("ADMIN", "CUSTOMER")
 
-    fake_user = create_user(mocker)
+    fake_user = mocker.Mock()
     db, fake_result, fake_scalars = create_db(mocker, fake_user)
     payload = mocker.Mock()
     payload.sub = "1"
@@ -136,9 +96,9 @@ async def test_get_current_user_with_roles_when_roles_intersect_and_user_not_fou
 
 def test_require_organizer_member_when_organizer_organizer_id_in_user_organizers(mocker):
     role = create_role(mocker, "ORGANIZER")
-    organizer1 = create_organizer(mocker, 1)
-    organizer2 = create_organizer(mocker, 2)
-    user = create_user(mocker, [role], [organizer1, organizer2])
+    organizer1 = mocker.Mock(id=1)
+    organizer2 = mocker.Mock(id=2)
+    user = mocker.Mock(roles=[role], organizers=[organizer1, organizer2])
 
     result = dependencies.require_organizer_member(1, user)
 
@@ -147,7 +107,7 @@ def test_require_organizer_member_when_organizer_organizer_id_in_user_organizers
 
 def test_require_organizer_member_when_admin(mocker):
     role = create_role(mocker, "ADMIN")
-    user = create_user(mocker, [role])
+    user = mocker.Mock(roles=[role])
 
     result = dependencies.require_organizer_member(333, user)
 
@@ -156,9 +116,9 @@ def test_require_organizer_member_when_admin(mocker):
 
 def test_require_organizer_member_when_organizer_id_not_in_user_organizer_raises_403(mocker):
     role = create_role(mocker, "ORGANIZER")
-    organizer1 = create_organizer(mocker, 1)
-    organizer2 = create_organizer(mocker, 2)
-    user = create_user(mocker, [role], [organizer1, organizer2])
+    organizer1 = mocker.Mock(id=1)
+    organizer2 = mocker.Mock(id=2)
+    user = mocker.Mock(roles=[role], organizers=[organizer1, organizer2])
 
     with pytest.raises(HTTPException) as e:
         dependencies.require_organizer_member(3, user)
@@ -168,11 +128,11 @@ def test_require_organizer_member_when_organizer_id_not_in_user_organizer_raises
 
 @pytest.mark.asyncio
 async def test_require_event_owner_when_event_exists_and_user_is_event_organizer(mocker):
-    organizer1 = create_organizer(mocker, 1)
-    organizer2 = create_organizer(mocker, 2)
+    organizer1 = mocker.Mock(id=1)
+    organizer2 = mocker.Mock(id=2)
     role = create_role(mocker, "ORGANIZER")
-    user = create_user(mocker, [role], [organizer1, organizer2])
-    event = create_event(mocker, 1)
+    user = mocker.Mock(roles=[role], organizers=[organizer1, organizer2])
+    event = mocker.Mock(organizer_id=1)
     db, _, _ = create_db(mocker, event)
 
     result = await dependencies.require_event_owner(1, db, user)
@@ -184,11 +144,11 @@ async def test_require_event_owner_when_event_exists_and_user_is_event_organizer
 
 @pytest.mark.asyncio
 async def test_require_event_owner_when_event_exists_and_user_is_not_event_organizer_raises_403(mocker):
-    organizer1 = create_organizer(mocker, 1)
-    organizer2 = create_organizer(mocker, 2)
+    organizer1 = mocker.Mock(id=1)
+    organizer2 = mocker.Mock(id=2)
     role = create_role(mocker, "ORGANIZER")
-    user = create_user(mocker, [role], [organizer1, organizer2])
-    event = create_event(mocker, 3)
+    user = mocker.Mock(roles=[role], organizers=[organizer1, organizer2])
+    event = mocker.Mock(organizer_id=3)
     db, _, _ = create_db(mocker, event)
 
     with pytest.raises(HTTPException) as e:
@@ -202,8 +162,8 @@ async def test_require_event_owner_when_event_exists_and_user_is_not_event_organ
 @pytest.mark.asyncio
 async def test_require_event_owner_when_event_exists_and_user_is_admin(mocker):
     role = create_role(mocker, "ADMIN")
-    user = create_user(mocker, [role])
-    event = create_event(mocker, 1)
+    user = mocker.Mock(roles=[role])
+    event = mocker.Mock(organizer_id=1)
     db, _, _ = create_db(mocker, event)
 
     result = await dependencies.require_event_owner(1, db, user)
@@ -215,7 +175,7 @@ async def test_require_event_owner_when_event_exists_and_user_is_admin(mocker):
 
 @pytest.mark.asyncio
 async def test_require_event_owner_when_event_does_not_exist_raises_404(mocker):
-    user = create_user(mocker)
+    user = mocker.Mock()
     db, _, _ = create_db(mocker, None)
 
     with pytest.raises(HTTPException) as e:
@@ -228,9 +188,10 @@ async def test_require_event_owner_when_event_does_not_exist_raises_404(mocker):
 
 @pytest.mark.asyncio
 async def test_require_event_ticket_type_access_when_event_ticket_type_exists(mocker):
-    spy = mocker.patch("app.core.dependencies.require_event_owner", return_value=mocker.AsyncMock())
-    user = create_user(mocker)
-    event_ticket_type = create_event_ticket_type(mocker, 1)
+    spy = mocker.patch("app.core.dependencies.require_event_owner", new=mocker.AsyncMock(return_value=None))
+    user = mocker.Mock()
+    event_sector = mocker.Mock(event_id=1)
+    event_ticket_type = mocker.Mock(event_sector=event_sector)
     db, _, _ = create_db(mocker, event_ticket_type)
 
     result = await dependencies.require_event_ticket_type_access(1, db, user)
@@ -243,7 +204,7 @@ async def test_require_event_ticket_type_access_when_event_ticket_type_exists(mo
 
 @pytest.mark.asyncio
 async def test_require_event_ticket_type_access_when_event_ticket_type_does_not_exist_raises_404(mocker):
-    user = create_user(mocker)
+    user = mocker.Mock()
     db, _, _ = create_db(mocker, None)
 
     with pytest.raises(HTTPException) as e:
