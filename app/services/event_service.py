@@ -118,7 +118,7 @@ async def list_events_for_organizer(db: AsyncSession, user: User, query: Organiz
         db,
         page=query.page,
         page_size=query.page_size,
-        statuses=list[query.status],
+        statuses=[query.status],
         organizer_ids=_get_organizer_ids(user),
         name=query.name
     )
