@@ -1,5 +1,6 @@
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.pagination import paginate
 from app.domain import Organizer
 
 
@@ -9,11 +10,36 @@ async def get_organizer_by_id(db: AsyncSession, organizer_id: int) -> Organizer 
     return result.scalars().first()
 
 
-async def list_all_organizers(db: AsyncSession, page: int, page_size: int) -> tuple[list[Organizer], int]:
-    total = await db.scalar(select(func.count()).select_from(Organizer))
-    stmt = select(Organizer).order_by(Organizer.id).limit(page_size).offset((page - 1) * page_size)
-    result = await db.scalars(stmt)
-    return list(result), int(total or 0)
+async def list_all_organizers(
+        db: AsyncSession,
+        page: int,
+        page_size: int,
+        *,
+        name: str | None = None,
+        email: str | None = None,
+        registration_number: str | None = None
+) -> tuple[list[Organizer], int]:
+    stmt = select(Organizer)
+    where = []
+
+    if name:
+        where.append(Organizer.name.ilike(f"%{name}%"))
+    if email:
+        where.append(Organizer.email == email)
+    if registration_number:
+        where.append(Organizer.registration_number == registration_number)
+
+    items, total = await paginate(
+        db,
+        stmt,
+        page=page,
+        page_size=page_size,
+        where=where,
+        order_by=[Organizer.id],
+        scalars=True,
+        count_by=Organizer.id
+    )
+    return items, total
 
 
 async def create_organizer(db: AsyncSession, data: dict) -> Organizer:
