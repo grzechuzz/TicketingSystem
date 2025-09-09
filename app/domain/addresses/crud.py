@@ -1,5 +1,6 @@
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.pagination import paginate
 from .models import Address
 
 
@@ -10,10 +11,18 @@ async def get_address_by_id(db: AsyncSession, address_id: int) -> Address | None
 
 
 async def list_all_addresses(db: AsyncSession, page: int, page_size: int) -> tuple[list[Address], int]:
-    total = await db.scalar(select(func.count()).select_from(Address))
-    stmt = select(Address).order_by(Address.id).limit(page_size).offset((page - 1) * page_size)
-    result = await db.scalars(stmt)
-    return list(result), int(total or 0)
+    stmt = select(Address)
+    items, total = await paginate(
+        db,
+        stmt,
+        page=page,
+        page_size=page_size,
+        where=[],
+        order_by=[Address.id],
+        scalars=True,
+        count_by=Address.id
+    )
+    return items, total
 
 
 async def create_address(db: AsyncSession, data: dict) -> Address:
