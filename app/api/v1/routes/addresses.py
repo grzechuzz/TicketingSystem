@@ -2,9 +2,10 @@ from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.users.models import User
 from app.core.database import get_db
+from app.core.pagination import PageDTO
 from app.core.dependencies import get_current_user_with_roles
 from app.services import address_service
-from app.domain.addresses.schemas import AddressCreateDTO, AddressReadDTO, AddressPutDTO
+from app.domain.addresses.schemas import AddressCreateDTO, AddressReadDTO, AddressPutDTO, AddressesQueryDTO
 from typing import Annotated
 
 
@@ -28,11 +29,11 @@ async def create_address(schema: AddressCreateDTO, db: db_dependency, response: 
 @router.get(
     "",
     status_code=status.HTTP_200_OK,
-    response_model=list[AddressReadDTO],
+    response_model=PageDTO[AddressReadDTO],
     dependencies=[Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER', 'CUSTOMER'))]
 )
-async def list_addresses(db: db_dependency):
-    addresses = await address_service.list_addresses(db)
+async def list_addresses(db: db_dependency, query: Annotated[AddressesQueryDTO, Depends()]):
+    addresses = await address_service.list_addresses(db, query)
     return addresses
 
 

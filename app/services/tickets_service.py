@@ -1,7 +1,7 @@
 from typing import Iterable, Any
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.pagination import PageDTO
+from app.core.pagination import PageDTO, paginate
 from app.domain.users.models import User
 from app.domain.events.models import Event
 from app.domain.venues.models import Venue, Sector, Seat
@@ -93,48 +93,34 @@ async def _list_tickets_helper(
         where: Iterable,
         page: int,
         page_size: int,
+        *,
         needs_user_join: bool,
-        needs_event_join: bool,
         full_holder: bool
 ) -> PageDTO[TicketReadItemDTO]:
-    total_stmt = (
-        select(func.count(Ticket.id))
-        .select_from(Ticket)
-        .join(TicketInstance, TicketInstance.id == Ticket.ticket_instance_id)
-        .join(Order, Order.id == TicketInstance.order_id)
+    base = _ticket_row_select()
+    if needs_user_join:
+        base = base.join(User, User.id == Order.user_id)
+
+    rows, total = await paginate(
+        db,
+        base_stmt=base,
+        page=page,
+        page_size=page_size,
+        where=where,
+        order_by=[Ticket.created_at.desc(), Ticket.id],
+        scalars=False,
+        count_by=Ticket.id
     )
 
-    if needs_user_join:
-        total_stmt = total_stmt.join(User, User.id == Order.user_id)
-    if needs_event_join:
-        total_stmt = total_stmt.join(Event, Event.id == TicketInstance.event_id)
-    if where:
-        total_stmt = total_stmt.where(*where)
-
-    total = await db.scalar(total_stmt)
-
-    rows_stmt = _ticket_row_select()
-    if needs_user_join:
-        rows_stmt = rows_stmt.join(User, User.id == Order.user_id)
-    if where:
-        rows_stmt = rows_stmt.where(*where)
-
-    rows_stmt = (
-        rows_stmt
-        .order_by(Ticket.created_at.desc(), Ticket.id)
-        .limit(page_size)
-        .offset((page - 1) * page_size)
-    )
-
-    rows = await db.execute(rows_stmt)
-    items = [_map_ticket_row(r, full_holder=full_holder) for r in rows.all()]
+    items = [_map_ticket_row(r, full_holder=full_holder) for r in rows]
 
     return PageDTO[TicketReadItemDTO](
         items=items,
-        total=int(total or 0),
+        total=total,
         page=page,
         page_size=page_size
     )
+
 
 async def list_user_tickets(
         db: AsyncSession,
@@ -151,7 +137,6 @@ async def list_user_tickets(
         page=query.page,
         page_size=query.page_size,
         needs_user_join=False,
-        needs_event_join=False,
         full_holder=True
     )
 
@@ -179,7 +164,6 @@ async def list_organizer_tickets(
         page=query.page,
         page_size=query.page_size,
         needs_user_join=(query.email is not None),
-        needs_event_join=True,
         full_holder=False
     )
 
@@ -210,6 +194,5 @@ async def list_admin_tickets(
         page=query.page,
         page_size=query.page_size,
         needs_user_join=(query.email is not None),
-        needs_event_join=True,
         full_holder=False
     )

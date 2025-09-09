@@ -5,14 +5,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
-from app.core.pagination import PageDTO
+from app.core.pagination import PageDTO, paginate
 from app.domain.booking.counters import invoice_counters
 from app.domain.booking.models import Invoice, Order, TicketInstance
 from app.domain.booking.schemas import UserInvoicesQueryDTO, InvoiceListItemDTO, InvoiceDetailsDTO, InvoiceLineDTO, \
     AdminInvoicesQueryDTO, AdminInvoiceListItemDTO
 from app.domain.users.models import User
 from app.domain.events.models import Event
-from typing import Iterable, Callable, Any
 
 
 TZ = ZoneInfo("Europe/Warsaw")
@@ -58,23 +57,10 @@ def _ti_agg_subquery():
     return ti_agg
 
 
-async def _list_invoices_helper[T](
-        db: AsyncSession,
-        where: Iterable,
-        page: int,
-        page_size: int,
-        join_user: bool,
-        row_mapper: Callable[[Any], T]
-) -> PageDTO[T]:
+def _invoice_base_select(admin: bool = False):
     ti_agg = _ti_agg_subquery()
 
-    total_stmt = select(func.count()).select_from(Invoice).join(Order)
-
-    if join_user:
-        total_stmt = total_stmt.join(User)
-    total = await db.scalar(total_stmt.where(*where))
-
-    row_stmt = (
+    base = (
         select(
             Invoice.id,
             Invoice.invoice_number,
@@ -90,28 +76,13 @@ async def _list_invoices_helper[T](
         .join(ti_agg, ti_agg.c.order_id == Order.id)
     )
 
-    if join_user:
-        row_stmt = row_stmt.add_columns(
+    if admin:
+        base = base.add_columns(
             User.id.label("user_id"),
             User.email.label("user_email")
         ).join(User)
 
-    row_stmt = (
-        row_stmt.where(*where)
-        .order_by(Invoice.issued_at.desc().nulls_last(), Invoice.id)
-        .limit(page_size)
-        .offset((page - 1) * page_size)
-    )
-
-    rows = await db.execute(row_stmt)
-    items = [row_mapper(r) for r in rows.all()]
-
-    return PageDTO[T](
-        items=items,
-        total=int(total or 0),
-        page=page,
-        page_size=page_size
-    )
+    return base
 
 
 def _map_user_invoice_row(r) -> InvoiceListItemDTO:
@@ -241,13 +212,24 @@ async def list_user_invoices(
         query: UserInvoicesQueryDTO
 ) -> PageDTO[InvoiceListItemDTO]:
     where = [Order.user_id == user.id, Invoice.issued_at.is_not(None)]
-    return await _list_invoices_helper(
-        db=db,
-        where=where,
+
+    rows, total = await paginate(
+        db,
+        _invoice_base_select(admin=False),
         page=query.page,
         page_size=query.page_size,
-        join_user=False,
-        row_mapper=_map_user_invoice_row
+        where=where,
+        order_by=[Invoice.issued_at.desc().nulls_last(), Invoice.id],
+        scalars=False,
+        count_by=Invoice.id
+    )
+
+    items = [_map_user_invoice_row(r) for r in rows]
+    return PageDTO[InvoiceListItemDTO](
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size
     )
 
 
@@ -265,13 +247,23 @@ async def list_admin_invoices(db: AsyncSession, query: AdminInvoicesQueryDTO) ->
     if query.invoice_type is not None:
         where.append(Invoice.invoice_type == query.invoice_type)
 
-    return await _list_invoices_helper(
-        db=db,
-        where=where,
+    rows, total = await paginate(
+        db,
+        _invoice_base_select(admin=True),
         page=query.page,
         page_size=query.page_size,
-        join_user=True,
-        row_mapper=_map_admin_invoice_row
+        where=where,
+        order_by=[Invoice.issued_at.desc().nulls_last(), Invoice.id],
+        scalars=False,
+        count_by=Invoice.id
+    )
+
+    items = [_map_admin_invoice_row(r) for r in rows]
+    return PageDTO[AdminInvoiceListItemDTO](
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size
     )
 
 

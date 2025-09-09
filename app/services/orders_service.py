@@ -2,12 +2,12 @@ from decimal import Decimal
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-from app.core.pagination import PageDTO
+from app.core.pagination import PageDTO, paginate
 from app.domain.users.models import User
-from app.domain.booking.models import Order, TicketInstance, Ticket, TicketStatus, TicketHolder
+from app.domain.booking.models import Order, TicketInstance
 from app.domain.payments.models import Payment, PaymentStatus
-from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, TicketReadItemDTO, \
-    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO, TicketHolderPublicDTO
+from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, \
+    AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO
 from app.domain.payments.schemas import PaymentInOrderDTO, PaymentMethodReadDTO
 
 
@@ -56,6 +56,15 @@ def _to_order_details(order: Order, payment_dto: PaymentInOrderDTO | None) -> Or
     )
 
 
+def _ticket_instance_count_subquery():
+    return (
+        select(func.count(TicketInstance.id))
+        .where(TicketInstance.order_id == Order.id)
+        .correlate(Order)
+        .scalar_subquery()
+    )
+
+
 async def list_user_orders(
         db: AsyncSession,
         user: User,
@@ -65,28 +74,27 @@ async def list_user_orders(
     if query.status is not None:
         where.append(Order.status == query.status)
 
-    total = await db.scalar(select(func.count()).select_from(Order).where(*where))
+    ti_count = _ticket_instance_count_subquery()
 
-    ti_count = (
-        select(func.count(TicketInstance.id))
-        .where(TicketInstance.order_id == Order.id)
-        .correlate(Order)
-        .scalar_subquery()
+    items_rows, total = await paginate(
+        db,
+        select(Order, ti_count.label("items_count")),
+        page=query.page,
+        page_size=query.page_size,
+        where=where,
+        order_by=[desc(Order.created_at), Order.id],
+        scalars=False,
+        count_by=Order.id
     )
 
-    rows = await db.execute(
-        select(Order, ti_count.label("items_count"))
-        .where(*where)
-        .order_by(desc(Order.created_at), Order.id)
-        .limit(query.page_size)
-        .offset((query.page - 1) * query.page_size)
+    items = [_to_order_list_item(order, int(items_count or 0)) for order, items_count in items_rows]
+
+    return PageDTO[OrderListItemDTO](
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size
     )
-
-    items = []
-    for order, items_count in rows.all():
-        items.append(_to_order_list_item(order, int(items_count or 0)))
-
-    return PageDTO[OrderListItemDTO](items=items, total=int(total or 0), page=query.page, page_size=query.page_size)
 
 
 async def get_user_order(db: AsyncSession, user: User, order_id: int) -> OrderDetailsDTO:
@@ -119,31 +127,21 @@ async def list_orders_admin(db: AsyncSession, query: AdminOrdersQueryDTO) -> Pag
     if query.email is not None:
         where.append(Order.user.has(func.lower(User.email) == func.lower(query.email)))
 
-    total = await db.scalar(select(func.count()).select_from(Order).where(*where))
+    ti_count = _ticket_instance_count_subquery()
 
-    ti_count = (
-        select(func.count(TicketInstance.id))
-        .where(TicketInstance.order_id == Order.id)
-        .correlate(Order)
-        .scalar_subquery()
-    )
-
-    rows = await db.execute(
-        select(
-            Order,
-            ti_count.label("items_count"),
-            User.id.label("user_id"),
-            User.email.label("user_email")
-        )
-        .join(User)
-        .where(*where)
-        .order_by(desc(Order.created_at), Order.id)
-        .limit(query.page_size)
-        .offset((query.page - 1) * query.page_size)
+    rows, total = await paginate(
+        db,
+        select(Order, ti_count.label("items_count"), User.id.label("user_id"), User.email.label("user_email")).join(User),
+        page=query.page,
+        page_size=query.page_size,
+        where=where,
+        order_by=[desc(Order.created_at), Order.id],
+        scalars=False,
+        count_by=Order.id
     )
 
     items = []
-    for order, items_count, user_id, user_email in rows.all():
+    for order, items_count, user_id, user_email in rows:
         items.append(
             AdminOrderListItemDTO(
                 id=order.id,

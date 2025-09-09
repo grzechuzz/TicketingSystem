@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
+from app.core.pagination import paginate
 from app.domain import Venue, Sector, Seat
 
 
@@ -10,10 +11,30 @@ async def get_venue_by_id(db: AsyncSession, venue_id: int) -> Venue | None:
     return result.scalars().first()
 
 
-async def list_all_venues(db: AsyncSession) -> list[Venue]:
+async def list_all_venues(
+        db: AsyncSession,
+        page: int,
+        page_size: int,
+        *,
+        name: str | None = None
+) -> tuple[list[Venue], int]:
     stmt = select(Venue)
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    where = []
+
+    if name:
+        where.append(Venue.name.ilike(f"%{name}%"))
+
+    items, total = await paginate(
+        db,
+        stmt,
+        page=page,
+        page_size=page_size,
+        where=where,
+        order_by=[Venue.id],
+        scalars=True,
+        count_by=Venue.id
+    )
+    return items, total
 
 
 async def create_venue(db: AsyncSession, data: dict) -> Venue:

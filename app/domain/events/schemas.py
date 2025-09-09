@@ -63,3 +63,35 @@ class EventStatusDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     new_status: EventStatus
+
+
+class PublicEventsQueryDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+    name: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+
+
+class OrganizerEventsQueryDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+    status: EventStatus | None = None
+    name: str | None = None
+
+
+class AdminEventsQueryDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+    statuses: list[EventStatus] | None = None
+    organizer_id: int | None = None
+    venue_id: int | None = None
+    name: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None

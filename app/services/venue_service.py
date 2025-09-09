@@ -1,9 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.pagination import PageDTO
 from app.domain.venues.models import Venue, Sector, Seat
 from app.domain.venues.schemas import VenueCreateDTO, VenueUpdateDTO, SectorCreateDTO, SectorUpdateDTO, SeatCreateDTO, \
-    SeatBulkCreateDTO, SeatUpdateDTO
+    SeatBulkCreateDTO, SeatUpdateDTO, VenuesQueryDTO, VenueReadDTO
 from app.domain.venues import crud
 from app.services.address_service import get_address
 
@@ -20,8 +21,15 @@ async def get_venue(db: AsyncSession, venue_id: int) -> Venue:
     return venue
 
 
-async def list_venues(db: AsyncSession) -> list[Venue]:
-    return await crud.list_all_venues(db)
+async def list_venues(db: AsyncSession, query: VenuesQueryDTO) -> PageDTO[VenueReadDTO]:
+    venues, total = await crud.list_all_venues(db, query.page, query.page_size, name=query.name)
+    items = [VenueReadDTO.model_validate(venue) for venue in venues]
+    return PageDTO(
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size
+    )
 
 
 async def create_venue(db: AsyncSession, schema: VenueCreateDTO) -> Venue:
