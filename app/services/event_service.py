@@ -2,12 +2,13 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.events.models import Event, EventStatus
-from app.domain.events.schemas import EventCreateDTO, EventUpdateDTO
+from app.domain.events.schemas import EventCreateDTO, EventUpdateDTO, EventReadDTO, PublicEventsQueryDTO, \
+    OrganizerEventsQueryDTO, AdminEventsQueryDTO
 from app.domain.users.models import User
+from app.core.pagination import PageDTO
 from app.services.venue_service import get_venue
 from app.domain.events import crud
 from datetime import datetime, timezone
-from typing import Iterable
 
 
 PUBLIC_STATUSES = {EventStatus.ON_SALE, EventStatus.PLANNED}
@@ -88,18 +89,65 @@ async def get_event(db: AsyncSession, event_id: int, user: User) -> Event:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
 
-async def list_public_events(db: AsyncSession) -> list[Event]:
-    return await crud.list_events(db, statuses=PUBLIC_STATUSES)
+async def list_public_events(db: AsyncSession, query: PublicEventsQueryDTO) -> PageDTO[EventReadDTO]:
+    events, total = await crud.list_events(
+        db,
+        page=query.page,
+        page_size=query.page_size,
+        statuses=PUBLIC_STATUSES,
+        name=query.name,
+        date_from=query.date_from,
+        date_to=query.date_to
+    )
+
+    items = [EventReadDTO.model_validate(event) for event in events]
+
+    return PageDTO(
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size
+    )
 
 
-async def list_events_for_organizer(db: AsyncSession, user: User) -> list[Event]:
+async def list_events_for_organizer(db: AsyncSession, user: User, query: OrganizerEventsQueryDTO) -> PageDTO[EventReadDTO]:
     if "ORGANIZER" not in _get_roles(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
-    return await crud.list_events(db, organizer_ids=_get_organizer_ids(user))
+
+    events, total = await crud.list_events(
+        db,
+        page=query.page,
+        page_size=query.page_size,
+        statuses=list[query.status],
+        organizer_ids=_get_organizer_ids(user),
+        name=query.name
+    )
+
+    items = [EventReadDTO.model_validate(event) for event in events]
+
+    return PageDTO(
+        items=items,
+        total=total,
+        page=query.page,
+        page_size=query.page_size
+    )
 
 
-async def list_events_for_admin(db: AsyncSession, statuses_filters: Iterable[EventStatus] | None = None) -> list[Event]:
-    return await crud.list_events(db, statuses=statuses_filters)
+async def list_events_for_admin(db: AsyncSession, query: AdminEventsQueryDTO) -> PageDTO[EventReadDTO]:
+    events, total = await crud.list_events(
+        db,
+        page=query.page,
+        page_size=query.page_size,
+        statuses=query.statuses,
+        venue_id=query.venue_id,
+        name=query.name,
+        date_from=query.date_from,
+        date_to=query.date_to,
+    )
+
+    items = [EventReadDTO.model_validate(e) for e in events]
+
+    return PageDTO(items=items, total=total, page=query.page, page_size=query.page_size)
 
 
 async def create_event(db: AsyncSession, organizer_id: int, schema: EventCreateDTO) -> Event:
