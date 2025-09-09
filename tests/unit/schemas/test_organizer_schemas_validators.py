@@ -9,7 +9,8 @@ test_org_payload = {
     "vat_number": "2393942231455",
     "registration_number": "REG12345",
     "iban": "PL341053420099760312356789123",
-    "country_code": "PL"
+    "country_code": "PL",
+    "address_id": 4
 }
 
 @pytest.mark.parametrize("raw, expected", [
