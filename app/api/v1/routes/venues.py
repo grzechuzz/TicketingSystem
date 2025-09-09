@@ -1,3 +1,4 @@
+from app.core.pagination import PageDTO
 from app.services import venue_service
 from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +9,7 @@ from app.domain.venues.schemas import (
     VenueUpdateDTO,
     VenueReadDTO,
     SectorReadDTO,
-    SectorCreateDTO
+    SectorCreateDTO, VenuesQueryDTO
 )
 from typing import Annotated
 
@@ -33,11 +34,11 @@ async def create_venue(schema: VenueCreateDTO, db: db_dependency, response: Resp
 @router.get(
     "",
     status_code=status.HTTP_200_OK,
-    response_model=list[VenueReadDTO],
+    response_model=PageDTO[VenueReadDTO],
     dependencies=[Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER', 'CUSTOMER'))]
 )
-async def get_all_venues(db: db_dependency):
-    venues = await venue_service.list_venues(db)
+async def get_all_venues(db: db_dependency, query: Annotated[VenuesQueryDTO, Depends()]):
+    venues = await venue_service.list_venues(db, query)
     return venues
 
 
