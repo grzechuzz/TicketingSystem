@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, model_validator, ValidationError, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, model_validator, ConfigDict
 from phonenumbers import parse, format_number, is_valid_number, PhoneNumberFormat, NumberParseException
 
 class OrganizerCreateDTO(BaseModel):
@@ -39,9 +39,9 @@ class OrganizerReadDTO(BaseModel):
     name: str
     email: EmailStr
     phone_number: str
-    vat_number: str
-    registration_number: str
-    iban: str
+    vat_number: str | None = None
+    registration_number: str | None = None
+    iban: str | None = None
     country_code: str
     address_id: int
     created_at: datetime
