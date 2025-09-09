@@ -28,6 +28,14 @@ class VenueUpdateDTO(BaseModel):
     _strip_name = field_validator("name", mode='before')(strip_text)
 
 
+class VenuesQueryDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+    name: str | None = None
+
+
 class SectorCreateDTO(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
