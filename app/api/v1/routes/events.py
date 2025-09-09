@@ -1,14 +1,16 @@
-from fastapi import APIRouter, status, Depends, Response, Query
+from fastapi import APIRouter, status, Depends, Response
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import require_organizer_member, require_event_owner, get_current_user_with_roles
-from app.domain.events.schemas import EventCreateDTO, EventReadDTO, EventUpdateDTO, EventStatusDTO
+from app.core.pagination import PageDTO
+from app.domain.events.schemas import EventCreateDTO, EventReadDTO, EventUpdateDTO, EventStatusDTO, AdminEventsQueryDTO, \
+    PublicEventsQueryDTO, OrganizerEventsQueryDTO
 from app.domain.pricing.schemas import EventTicketTypeBulkCreateDTO, EventTicketTypeCreateDTO, EventTicketTypeReadDTO
 from app.domain.allocation.schemas import EventSectorReadDTO, EventSectorCreateDTO, EventSectorBulkCreateDTO
 from app.domain.users.models import User
 from app.services import event_service, event_sectors_service, event_ticket_type_service
-from app.domain.events.models import Event, EventStatus
+from app.domain.events.models import Event
 
 
 router = APIRouter(tags=["events"])
@@ -18,11 +20,11 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
 @router.get(
     "/events",
     status_code=status.HTTP_200_OK,
-    response_model=list[EventReadDTO],
+    response_model=PageDTO[EventReadDTO],
     dependencies=[Depends(get_current_user_with_roles("ADMIN", "ORGANIZER", "CUSTOMER"))]
 )
-async def list_events(db: db_dependency):
-    return await event_service.list_public_events(db)
+async def list_events(db: db_dependency, query: Annotated[PublicEventsQueryDTO, Depends()]):
+    return await event_service.list_public_events(db, query)
 
 
 @router.get(
@@ -41,12 +43,14 @@ async def get_event(
 @router.get(
     "/organizers/me/events",
     status_code=status.HTTP_200_OK,
-    response_model=list[EventReadDTO],
+    response_model=PageDTO[EventReadDTO]
 )
 async def list_organizer_events(
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ORGANIZER"))]):
-    return await event_service.list_events_for_organizer(db, user)
+        user: Annotated[User, Depends(get_current_user_with_roles("ORGANIZER"))],
+        query: Annotated[OrganizerEventsQueryDTO, Depends()]
+):
+    return await event_service.list_events_for_organizer(db, user, query)
 
 
 @router.post(
@@ -69,14 +73,14 @@ async def create_event(
 @router.get(
     "/admin/events",
     status_code=status.HTTP_200_OK,
-    response_model=list[EventReadDTO],
+    response_model=PageDTO[EventReadDTO]
 )
 async def list_admin_events(
         db: db_dependency,
         user: Annotated[User, Depends(get_current_user_with_roles("ADMIN"))],
-        statuses: Annotated[list[EventStatus] | None, Query()] = None
+        query: Annotated[AdminEventsQueryDTO, Depends()]
 ):
-    return await event_service.list_events_for_admin(db, statuses)
+    return await event_service.list_events_for_admin(db, query)
 
 
 @router.patch(
