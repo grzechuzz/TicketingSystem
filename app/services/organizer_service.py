@@ -16,7 +16,14 @@ async def get_organizer(db: AsyncSession, organizer_id: int) -> Organizer:
 
 
 async def list_organizers(db: AsyncSession, query: OrganizersQueryDTO) -> PageDTO[OrganizerReadDTO]:
-    organizers, total = await crud.list_all_organizers(db, query.page, query.page_size)
+    organizers, total = await crud.list_all_organizers(
+        db,
+        query.page,
+        query.page_size,
+        name=query.name,
+        email=query.email,
+        registration_number=query.registration_number
+    )
 
     items = [OrganizerReadDTO.model_validate(organizer) for organizer in organizers]
 
