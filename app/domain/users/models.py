@@ -44,4 +44,10 @@ class User(Base):
         lazy='selectin'
     )
 
+    refresh_sessions: Mapped[list["AuthRefreshSession"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     orders: Mapped[list["Order"]] = relationship(back_populates="user", lazy='selectin')
