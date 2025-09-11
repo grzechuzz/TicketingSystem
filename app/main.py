@@ -1,9 +1,11 @@
 from fastapi import FastAPI
+from app.core.middleware.request_id import RequestIdMiddleware
 from app.api.v1.routes import (auth, addresses, organizers, venues, sectors, events, seats, ticket_types,
                                event_ticket_types, booking, cart, payment_methods, payments, orders, invoices,
                                tickets, users, admin_maintenance)
 
 app = FastAPI()
+app.add_middleware(RequestIdMiddleware, header_name="X-Request-ID")
 app.include_router(auth.router)
 app.include_router(addresses.router)
 app.include_router(organizers.router)
