@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, Response
+from fastapi import APIRouter, status, Depends, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.users.models import User
 from app.core.database import get_db
@@ -17,11 +17,16 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=AddressReadDTO,
-    response_model_exclude_none=True,
-    dependencies=[Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER'))]
+    response_model_exclude_none=True
 )
-async def create_address(schema: AddressCreateDTO, db: db_dependency, response: Response):
-    address = await address_service.create_address(db, schema)
+async def create_address(
+        schema: AddressCreateDTO,
+        db: db_dependency,
+        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER'))],
+        response: Response,
+        request: Request
+):
+    address = await address_service.create_address(db, schema, user, request)
     response.headers["Location"] = f"{router.prefix}/{address.id}"
     return address
 
@@ -57,7 +62,8 @@ async def update_address(
         address_id: int,
         schema: AddressPutDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER'))]
+        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER'))],
+        request: Request
 ):
-    address = await address_service.update_address(db, schema, address_id, user)
+    address = await address_service.update_address(db, schema, address_id, user, request)
     return address
