@@ -2,8 +2,25 @@ from fastapi import FastAPI
 from app.api.v1.routes import (auth, addresses, organizers, venues, sectors, events, seats, ticket_types,
                                event_ticket_types, booking, cart, payment_methods, payments, orders, invoices,
                                tickets, users, admin_maintenance)
+from app.core.middleware.request_id import RequestIdMiddleware
+from app.core.redis import create_redis
+
 
 app = FastAPI()
+app.add_middleware(RequestIdMiddleware, header_name="X-Request-ID")
+
+
+async def lifespan(app: FastAPI):
+    r = await create_redis()
+    app.state.redis = r
+    try:
+        yield
+    finally:
+        await r.aclose()
+
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(RequestIdMiddleware)
 app.include_router(auth.router)
 app.include_router(addresses.router)
 app.include_router(organizers.router)
