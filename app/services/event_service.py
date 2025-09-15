@@ -114,11 +114,13 @@ async def list_events_for_organizer(db: AsyncSession, user: User, query: Organiz
     if "ORGANIZER" not in _get_roles(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
+    statuses = [query.status] if query.status is not None else None
+
     events, total = await crud.list_events(
         db,
         page=query.page,
         page_size=query.page_size,
-        statuses=[query.status],
+        statuses=statuses,
         organizer_ids=_get_organizer_ids(user),
         name=query.name
     )
@@ -134,11 +136,14 @@ async def list_events_for_organizer(db: AsyncSession, user: User, query: Organiz
 
 
 async def list_events_for_admin(db: AsyncSession, query: AdminEventsQueryDTO) -> PageDTO[EventReadDTO]:
+    organizer_ids = [query.organizer_id] if query.organizer_id is not None else None
+
     events, total = await crud.list_events(
         db,
         page=query.page,
         page_size=query.page_size,
         statuses=query.statuses,
+        organizer_ids=organizer_ids,
         venue_id=query.venue_id,
         name=query.name,
         date_from=query.date_from,
