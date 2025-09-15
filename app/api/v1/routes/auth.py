@@ -20,8 +20,8 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
     response_model=UserReadDTO,
     response_model_exclude_none=True
 )
-async def register(db: db_dependency, model: UserCreateDTO, response: Response):
-    user = await create_user(model, db)
+async def register(db: db_dependency, model: UserCreateDTO, response: Response, request: Request):
+    user = await create_user(model, db, request)
     response.headers['Location'] = f"/users/me"
     return UserReadDTO.model_validate(user)
 
@@ -37,13 +37,14 @@ async def refresh(schema: RefreshRequest, db: db_dependency, request: Request):
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(schema: LogoutRequest, db: db_dependency):
-    await logout_with_refresh(db, schema.refresh_token)
+async def logout(schema: LogoutRequest, db: db_dependency, request: Request):
+    await logout_with_refresh(db, schema.refresh_token, request)
 
 
 @router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
 async def logout_all_sessions(
     db: db_dependency,
     user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER", "ORGANIZER", "ADMIN"))],
+    request: Request
 ):
-    await logout_all(db, user.id)
+    await logout_all(db, user.id, request)
