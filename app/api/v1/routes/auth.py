@@ -47,4 +47,4 @@ async def logout_all_sessions(
     user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER", "ORGANIZER", "ADMIN"))],
     request: Request
 ):
-    await logout_all(db, user.id, request)
+    await logout_all(db, user, request)
