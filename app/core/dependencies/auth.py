@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from typing import Annotated
+from typing import Annotated, NamedTuple
 from jose import JWTError, jwt
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -15,6 +15,11 @@ from app.domain.pricing.models import EventTicketType
 from app.domain.allocation.models import EventSector
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+class EventActor(NamedTuple):
+    event: Event
+    user: User
 
 
 async def get_token_payload(token: Annotated[str, Depends(oauth2_bearer)]) -> TokenPayload:
