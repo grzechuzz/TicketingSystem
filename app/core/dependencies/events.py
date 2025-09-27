@@ -17,6 +17,11 @@ class EventActor(NamedTuple):
     user: User
 
 
+class EventTicketTypeActor(NamedTuple):
+    event_ticket_type: EventTicketType
+    user: User
+
+
 async def _ensure_event_owner(event_id: int, db: AsyncSession, user: User) -> Event:
     event = (await db.execute(select(Event).where(Event.id == event_id))).scalars().first()
     if not event:
@@ -65,7 +70,7 @@ async def require_event_ticket_type_access(
         event_ticket_type_id: int,
         db: Annotated[AsyncSession, Depends(get_db)],
         user: Annotated[User, Depends(ADMIN_OR_ORG)]
-) -> EventTicketType:
+) -> EventTicketTypeActor:
     stmt = select(EventTicketType).join(EventSector).where(EventTicketType.id == event_ticket_type_id)
     result = await db.execute(stmt)
     event_ticket_type = result.scalars().first()
@@ -73,4 +78,4 @@ async def require_event_ticket_type_access(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event ticket type not found")
 
     await _ensure_event_owner(event_ticket_type.event_sector.event_id, db=db, user=user)
-    return event_ticket_type
+    return EventTicketTypeActor(event_ticket_type, user)
