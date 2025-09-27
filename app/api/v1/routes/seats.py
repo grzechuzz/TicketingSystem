@@ -2,7 +2,7 @@ from app.services import venue_service
 from fastapi import APIRouter, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import get_current_user_with_roles
+from app.core.dependencies.auth import get_current_user_with_roles
 from app.domain.venues.schemas import SeatUpdateDTO, SeatReadDTO
 from typing import Annotated
 

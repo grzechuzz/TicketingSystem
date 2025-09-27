@@ -2,7 +2,8 @@ from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.organizers.schemas import OrganizerCreateDTO, OrganizerReadDTO, OrganizerPutDTO, OrganizersQueryDTO
 from app.domain.users.models import User
-from app.core.dependencies import get_db, get_current_user_with_roles
+from app.core.dependencies.auth import get_current_user_with_roles
+from app.core.database import get_db
 from app.core.pagination import PageDTO
 from app.services import organizer_service
 from typing import Annotated

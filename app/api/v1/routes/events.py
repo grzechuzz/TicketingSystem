@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, Response
+from fastapi import APIRouter, status, Depends, Response, Request
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -142,9 +142,11 @@ async def create_event_sector_for_event(
         event: Annotated[Event, Depends(require_event_owner)],
         schema: EventSectorCreateDTO,
         db: db_dependency,
-        response: Response
+        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))],
+        response: Response,
+        request: Request
 ):
-    event_sector = await event_sectors_service.create_event_sector(db, schema, event)
+    event_sector = await event_sectors_service.create_event_sector(db, schema, event, user, request)
     response.headers["Location"] = f"/events/{event.id}/sectors/{event_sector.sector_id}"
     return event_sector
 
@@ -156,9 +158,11 @@ async def create_event_sector_for_event(
 async def bulk_add_event_sectors_for_event(
         event: Annotated[Event, Depends(require_event_owner)],
         schema: EventSectorBulkCreateDTO,
-        db: db_dependency
+        db: db_dependency,
+        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))],
+        request: Request
 ):
-    await event_sectors_service.bulk_create_event_sectors(db, schema, event)
+    await event_sectors_service.bulk_create_event_sectors(db, schema, event, user, request)
 
 
 @router.delete(
@@ -168,9 +172,11 @@ async def bulk_add_event_sectors_for_event(
 async def delete_event_sector_for_event(
         event: Annotated[Event, Depends(require_event_owner)],
         sector_id: int,
-        db: db_dependency
+        db: db_dependency,
+        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))],
+        request: Request
 ):
-    await event_sectors_service.delete_event_sector(db, event.id, sector_id)
+    await event_sectors_service.delete_event_sector(db, event.id, sector_id, user, request)
 
 
 @router.get(

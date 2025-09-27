@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from typing import Annotated
 from app.domain.pricing.schemas import TicketTypeReadDTO, TicketTypeCreateDTO
-from app.core.dependencies import get_current_user_with_roles
+from app.core.dependencies.auth import get_current_user_with_roles
 from app.services import ticket_type_service
 
 

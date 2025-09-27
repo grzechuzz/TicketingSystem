@@ -6,7 +6,7 @@ from app.domain.users.models import User
 from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, \
     AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO
 from app.core.pagination import PageDTO
-from app.core.dependencies import get_current_user_with_roles
+from app.core.dependencies.auth import get_current_user_with_roles
 from app.services import orders_service
 
 
