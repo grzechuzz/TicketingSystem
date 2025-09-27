@@ -2,7 +2,8 @@ from fastapi import APIRouter, status, Depends, Response, Request
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import require_organizer_member, require_event_owner, get_current_user_with_roles
+from app.core.dependencies.events import require_event_actor, EventActor, require_organizer_member, require_event_owner
+from app.core.dependencies.auth import get_current_user_with_roles
 from app.core.pagination import PageDTO
 from app.domain.events.schemas import EventCreateDTO, EventReadDTO, EventUpdateDTO, EventStatusDTO, AdminEventsQueryDTO, \
     PublicEventsQueryDTO, OrganizerEventsQueryDTO
@@ -139,13 +140,14 @@ async def get_all_event_sectors_by_event(event_id: int, db: db_dependency):
     response_model_exclude_none=True
 )
 async def create_event_sector_for_event(
-        event: Annotated[Event, Depends(require_event_owner)],
+        event_actor: Annotated[EventActor, Depends(require_event_actor)],
         schema: EventSectorCreateDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))],
         response: Response,
         request: Request
 ):
+    event = event_actor.event
+    user = event_actor.user
     event_sector = await event_sectors_service.create_event_sector(db, schema, event, user, request)
     response.headers["Location"] = f"/events/{event.id}/sectors/{event_sector.sector_id}"
     return event_sector
@@ -156,12 +158,13 @@ async def create_event_sector_for_event(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def bulk_add_event_sectors_for_event(
-        event: Annotated[Event, Depends(require_event_owner)],
+        event_actor: Annotated[EventActor, Depends(require_event_actor)],
         schema: EventSectorBulkCreateDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))],
         request: Request
 ):
+    event = event_actor.event
+    user = event_actor.user
     await event_sectors_service.bulk_create_event_sectors(db, schema, event, user, request)
 
 
@@ -170,12 +173,13 @@ async def bulk_add_event_sectors_for_event(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_event_sector_for_event(
-        event: Annotated[Event, Depends(require_event_owner)],
+        event_actor: Annotated[EventActor, Depends(require_event_actor)],
         sector_id: int,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))],
         request: Request
 ):
+    event = event_actor.event
+    user = event_actor.user
     await event_sectors_service.delete_event_sector(db, event.id, sector_id, user, request)
 
 
