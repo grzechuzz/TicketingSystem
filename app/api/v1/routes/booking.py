@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, status, Request
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -24,6 +24,7 @@ async def reserve_ticket(
         db: db_dependency,
         user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER", "ADMIN"))],
         response: Response,
+        request: Request
 ):
     order, ticket_instance = await booking_service.reserve_ticket(
         db=db,
@@ -31,6 +32,7 @@ async def reserve_ticket(
         event_id=event_id,
         event_ticket_type_id=schema.event_ticket_type_id,
         seat_id=schema.seat_id,
+        request=request
     )
 
     response.headers["Location"] = f"/users/me/orders/{order.id}"
