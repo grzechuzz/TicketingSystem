@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from typing import Annotated, NamedTuple
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies.auth import get_current_user_with_roles
@@ -71,11 +72,15 @@ async def require_event_ticket_type_access(
         db: Annotated[AsyncSession, Depends(get_db)],
         user: Annotated[User, Depends(ADMIN_OR_ORG)]
 ) -> EventTicketTypeActor:
-    stmt = select(EventTicketType).join(EventSector).where(EventTicketType.id == event_ticket_type_id)
-    result = await db.execute(stmt)
-    event_ticket_type = result.scalars().first()
-    if not event_ticket_type:
+    row = await db.execute(
+        select(EventTicketType, EventSector.event_id)
+        .join(EventSector)
+        .where(EventTicketType.id == event_ticket_type_id)
+    )
+    result = row.first()
+    if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event ticket type not found")
 
-    await _ensure_event_owner(event_ticket_type.event_sector.event_id, db=db, user=user)
+    event_ticket_type, event_id = result
+    await _ensure_event_owner(event_id, db=db, user=user)
     return EventTicketTypeActor(event_ticket_type, user)
