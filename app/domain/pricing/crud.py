@@ -22,8 +22,8 @@ async def create_ticket_type(db: AsyncSession, data: dict) -> TicketType:
     return ticket_type
 
 
-async def delete_ticket_type(db: AsyncSession, ticket_type: TicketType) -> None:
-    await db.delete(ticket_type)
+def delete_ticket_type(db: AsyncSession, ticket_type: TicketType) -> None:
+    db.delete(ticket_type)
 
 
 async def get_event_ticket_type(db: AsyncSession, event_ticket_type_id: int) -> EventTicketType | None:
@@ -56,5 +56,5 @@ async def update_event_ticket_type(event_ticket_type: EventTicketType, data: dic
     return event_ticket_type
 
 
-async def delete_event_ticket_type(db: AsyncSession, event_ticket_type: EventTicketType) -> None:
-    await db.delete(event_ticket_type)
+def delete_event_ticket_type(db: AsyncSession, event_ticket_type: EventTicketType) -> None:
+    db.delete(event_ticket_type)

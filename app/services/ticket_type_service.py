@@ -30,7 +30,7 @@ async def create_ticket_type(db: AsyncSession, schema: TicketTypeCreateDTO) -> T
 
 async def delete_ticket_type(db: AsyncSession, ticket_type_id: int) -> None:
     ticket_type = await get_ticket_type(db, ticket_type_id)
-    await crud.delete_ticket_type(db, ticket_type)
+    crud.delete_ticket_type(db, ticket_type)
     try:
         await db.flush()
     except IntegrityError:
