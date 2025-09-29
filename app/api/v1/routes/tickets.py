@@ -2,7 +2,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies.auth import get_current_user_with_roles, require_organizer_member
+from app.core.dependencies.auth import get_current_user_with_roles
+from app.core.dependencies.events import require_organizer_member
 from app.core.pagination import PageDTO
 from app.domain.users.models import User
 from app.domain.booking.schemas import UserTicketsQueryDTO, OrganizerTicketsQueryDTO, AdminTicketsQueryDTO, \
