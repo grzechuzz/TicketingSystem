@@ -6,10 +6,6 @@ from app.core.middleware.request_id import RequestIdMiddleware
 from app.core.redis import create_redis
 
 
-app = FastAPI()
-app.add_middleware(RequestIdMiddleware, header_name="X-Request-ID")
-
-
 async def lifespan(app: FastAPI):
     r = await create_redis()
     app.state.redis = r
@@ -20,7 +16,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(RequestIdMiddleware)
+app.add_middleware(RequestIdMiddleware, header_name="X-Request-ID")
 app.include_router(auth.router)
 app.include_router(addresses.router)
 app.include_router(organizers.router)
