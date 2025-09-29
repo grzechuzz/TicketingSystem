@@ -33,7 +33,7 @@ async def list_events(
     if venue_id is not None:
         where.append(Event.venue_id == venue_id)
     if name:
-        where.append(func.lower(Event.name).ilike(f"%{name}%"))
+        where.append(Event.name.ilike(f"%{name}%"))
     if date_from is not None:
         where.append(Event.event_start >= date_from)
     if date_to is not None:

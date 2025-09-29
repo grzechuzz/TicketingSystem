@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import get_current_user_with_roles
+from app.core.dependencies.auth import get_current_user_with_roles
 from app.domain.users.schemas import UserCreateDTO, UserReadDTO
 from app.domain.auth.schemas import LoginResponse, RefreshRequest, LogoutRequest
 from app.domain.users.models import User
@@ -47,4 +47,4 @@ async def logout_all_sessions(
     user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER", "ORGANIZER", "ADMIN"))],
     request: Request
 ):
-    await logout_all(db, user.id, request)
+    await logout_all(db, user, request)

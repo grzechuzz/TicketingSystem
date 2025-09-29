@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status, Query
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import get_current_user_with_roles
+from app.core.dependencies.auth import get_current_user_with_roles
 from app.services.booking_service import cleanup_expired_reservations
 from pydantic import BaseModel
 

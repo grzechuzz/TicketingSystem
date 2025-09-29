@@ -1,10 +1,10 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Request
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import get_current_user_with_roles, require_event_ticket_type_access
+from app.core.dependencies.auth import get_current_user_with_roles
+from app.core.dependencies.events import require_event_ticket_type_access, EventTicketTypeActor
 from app.domain.pricing.schemas import EventTicketTypeReadDTO, EventTicketTypeUpdateDTO
-from app.domain.pricing.models import EventTicketType
 from app.services import event_ticket_type_service
 
 
@@ -30,11 +30,14 @@ async def get_event_ticket_type(event_ticket_type_id: int, db: db_dependency):
     response_model_exclude_none=True,
 )
 async def update_event_ticket_type(
-        event_ticket_type: Annotated[EventTicketType, Depends(require_event_ticket_type_access)],
+        event_ticket_type_actor: Annotated[EventTicketTypeActor, Depends(require_event_ticket_type_access)],
         schema: EventTicketTypeUpdateDTO,
-        db: db_dependency
+        db: db_dependency,
+        request: Request
 ):
-    return await event_ticket_type_service.update_event_ticket_type(db, event_ticket_type, schema)
+    return await event_ticket_type_service.update_event_ticket_type(
+        db, event_ticket_type_actor.event_ticket_type, schema, event_ticket_type_actor.user, request
+    )
 
 
 @router.delete(
@@ -42,7 +45,10 @@ async def update_event_ticket_type(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_event_ticket_type(
-        event_ticket_type: Annotated[EventTicketType, Depends(require_event_ticket_type_access)],
-        db: db_dependency
+        event_ticket_type_actor: Annotated[EventTicketTypeActor, Depends(require_event_ticket_type_access)],
+        db: db_dependency,
+        request: Request
 ):
-    await event_ticket_type_service.delete_event_ticket_type(db, event_ticket_type)
+    await event_ticket_type_service.delete_event_ticket_type(
+        db, event_ticket_type_actor.event_ticket_type, event_ticket_type_actor.user, request
+    )

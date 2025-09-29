@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.events.models import Event, EventStatus
@@ -6,6 +6,7 @@ from app.domain.events.schemas import EventCreateDTO, EventUpdateDTO, EventReadD
     OrganizerEventsQueryDTO, AdminEventsQueryDTO
 from app.domain.users.models import User
 from app.core.pagination import PageDTO
+from app.core.auditing import AuditSpan
 from app.services.venue_service import get_venue
 from app.domain.events import crud
 from datetime import datetime, timezone
@@ -110,15 +111,21 @@ async def list_public_events(db: AsyncSession, query: PublicEventsQueryDTO) -> P
     )
 
 
-async def list_events_for_organizer(db: AsyncSession, user: User, query: OrganizerEventsQueryDTO) -> PageDTO[EventReadDTO]:
+async def list_events_for_organizer(
+        db: AsyncSession,
+        user: User,
+        query: OrganizerEventsQueryDTO
+) -> PageDTO[EventReadDTO]:
     if "ORGANIZER" not in _get_roles(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    statuses = [query.status] if query.status is not None else None
 
     events, total = await crud.list_events(
         db,
         page=query.page,
         page_size=query.page_size,
-        statuses=[query.status],
+        statuses=statuses,
         organizer_ids=_get_organizer_ids(user),
         name=query.name
     )
@@ -134,11 +141,14 @@ async def list_events_for_organizer(db: AsyncSession, user: User, query: Organiz
 
 
 async def list_events_for_admin(db: AsyncSession, query: AdminEventsQueryDTO) -> PageDTO[EventReadDTO]:
+    organizer_ids = [query.organizer_id] if query.organizer_id is not None else None
+
     events, total = await crud.list_events(
         db,
         page=query.page,
         page_size=query.page_size,
         statuses=query.statuses,
+        organizer_ids=organizer_ids,
         venue_id=query.venue_id,
         name=query.name,
         date_from=query.date_from,
@@ -150,56 +160,105 @@ async def list_events_for_admin(db: AsyncSession, query: AdminEventsQueryDTO) ->
     return PageDTO(items=items, total=total, page=query.page, page_size=query.page_size)
 
 
-async def create_event(db: AsyncSession, organizer_id: int, schema: EventCreateDTO) -> Event:
-    await get_venue(db, schema.venue_id)
-    data = schema.model_dump(exclude_none=True)
-    data['organizer_id'] = organizer_id
-    _validate_event_times_on_create(data)
+async def create_event(
+        db: AsyncSession,
+        organizer_id: int,
+        schema: EventCreateDTO,
+        user: User,
+        request: Request
+) -> Event:
+    async with AuditSpan(
+        request,
+        scope="EVENTS",
+        action="CREATE",
+        user=user,
+        object_type="event",
+        organizer_id=organizer_id,
+        meta={"venue_id": schema.venue_id}
+    ) as span:
+        await get_venue(db, schema.venue_id)
+        data = schema.model_dump(exclude_none=True)
+        data['organizer_id'] = organizer_id
+        _validate_event_times_on_create(data)
 
-    event = await crud.create_event(db, data)
-    try:
-        await db.flush()
-    except IntegrityError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
-    return event
+        event = await crud.create_event(db, data)
+        try:
+            await db.flush()
+        except IntegrityError as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
+
+        span.object_id = event.id
+        span.event_id = event.id
+        return event
 
 
-async def update_event(db: AsyncSession, schema: EventUpdateDTO, event: Event) -> Event:
-    data = schema.model_dump(exclude_none=True)
-    _validate_event_times_on_update(data, event)
+async def update_event(db: AsyncSession, schema: EventUpdateDTO, event: Event, user: User, request: Request) -> Event:
+    fields = list(schema.model_dump(exclude_none=True).keys())
+    async with AuditSpan(
+        request,
+        scope="EVENTS",
+        action="UPDATE",
+        user=user,
+        object_type="event",
+        organizer_id=event.organizer_id,
+        event_id=event.id,
+        meta={"fields": fields}
+    ) as span:
+        data = schema.model_dump(exclude_none=True)
+        _validate_event_times_on_update(data, event)
 
-    event = await crud.update_event(event, data)
-    try:
-        await db.flush()
-        await db.refresh(event)
-    except IntegrityError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
-    return event
+        event = await crud.update_event(event, data)
+        try:
+            await db.flush()
+            await db.refresh(event)
+        except IntegrityError as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event time conflict") from e
+        span.object_id = event.id
+        return event
 
 
-async def update_event_status(db: AsyncSession, new_status: EventStatus, event_id: int) -> Event:
-    event = await crud.get_event_by_id(db, event_id)
-    if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+async def update_event_status(
+        db: AsyncSession,
+        new_status: EventStatus,
+        event_id: int,
+        user: User,
+        request: Request
+) -> Event:
+    async with AuditSpan(
+        request,
+        scope="EVENTS",
+        action="SET_STATUS",
+        user=user,
+        object_type="event",
+        event_id=event_id
+    ) as span:
+        event = await crud.get_event_by_id(db, event_id)
+        if not event:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    allowed_transitions = {
-        EventStatus.AWAITING_APPROVAL: {EventStatus.PLANNED, EventStatus.REJECTED},
-        EventStatus.PLANNED: {EventStatus.ON_SALE, EventStatus.CANCELLED},
-        EventStatus.ON_SALE: {EventStatus.ENDED, EventStatus.CANCELLED}
-    }
+        span.organizer_id = event.organizer_id
+        span.object_id = event.id
 
-    current = event.status
-    if new_status == current:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status is already set")
+        allowed_transitions = {
+            EventStatus.AWAITING_APPROVAL: {EventStatus.PLANNED, EventStatus.REJECTED},
+            EventStatus.PLANNED: {EventStatus.ON_SALE, EventStatus.CANCELLED},
+            EventStatus.ON_SALE: {EventStatus.ENDED, EventStatus.CANCELLED}
+        }
 
-    allowed = allowed_transitions.get(current, set())
-    if new_status not in allowed:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invalid status transition")
+        current = event.status
+        if new_status == current:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status is already set")
 
-    event.status = new_status
-    try:
-        await db.flush()
-        await db.refresh(event)
-    except IntegrityError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Statuses conflict") from e
-    return event
+        allowed = allowed_transitions.get(current, set())
+        if new_status not in allowed:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invalid status transition")
+
+        event.status = new_status
+        try:
+            await db.flush()
+            await db.refresh(event)
+        except IntegrityError as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Statuses conflict") from e
+
+        span.meta.update({"from": current, "to": new_status})
+        return event
