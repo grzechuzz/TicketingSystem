@@ -233,7 +233,7 @@ async def delete_seat(db: AsyncSession, seat_id: int, user: User, request: Reque
         object_id=seat_id
     ):
         seat = await get_seat(db, seat_id)
-        await crud.delete_seat(db, seat)
+        crud.delete_seat(db, seat)
         try:
             await db.flush()
         except IntegrityError:

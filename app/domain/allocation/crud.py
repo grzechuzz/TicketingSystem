@@ -27,5 +27,5 @@ async def bulk_add_event_sectors(db: AsyncSession, event_id: int, data: list[dic
     await db.execute(stmt)
 
 
-async def delete_event_sector(db: AsyncSession, event_sector: EventSector) -> None:
-    await db.delete(event_sector)
+def delete_event_sector(db: AsyncSession, event_sector: EventSector) -> None:
+    db.delete(event_sector)
