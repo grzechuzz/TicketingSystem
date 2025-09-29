@@ -16,7 +16,7 @@ class EventCreateDTO(BaseModel):
     max_tickets_per_user: int | None = Field(default=None, gt=0)
     age_restriction: int | None = Field(default=None, ge=0)
     holder_data_required: bool = Field(default=False)
-    description: str | None = Field(min_length=10, max_length=1000)
+    description: str | None = Field(default=None, min_length=10, max_length=1000)
 
     _strip_name = field_validator("name", mode="before")(strip_text)
     _strip_desc = field_validator("description", mode="before")(strip_text)

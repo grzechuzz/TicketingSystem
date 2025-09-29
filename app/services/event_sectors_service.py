@@ -105,7 +105,7 @@ async def delete_event_sector(db: AsyncSession, event_id: int, sector_id: int, u
     ) as span:
         event_sector = await get_event_sector(db, event_id, sector_id)
         span.object_id = event_sector.id
-        await crud.delete_event_sector(db, event_sector)
+        crud.delete_event_sector(db, event_sector)
         try:
             await db.flush()
         except IntegrityError:

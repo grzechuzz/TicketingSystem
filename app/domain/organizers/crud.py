@@ -54,5 +54,5 @@ async def update_organizer(organizer: Organizer, data: dict) -> Organizer:
     return organizer
 
 
-async def delete_organizer(db: AsyncSession, organizer: Organizer) -> None:
-    await db.delete(organizer)
+def delete_organizer(db: AsyncSession, organizer: Organizer) -> None:
+    db.delete(organizer)
