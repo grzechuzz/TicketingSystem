@@ -72,12 +72,14 @@ async def require_event_ticket_type_access(
         db: Annotated[AsyncSession, Depends(get_db)],
         user: Annotated[User, Depends(ADMIN_OR_ORG)]
 ) -> EventTicketTypeActor:
-    stmt = await db.execute(
+    stmt = (
         select(EventTicketType, EventSector.event_id)
         .join(EventSector)
         .where(EventTicketType.id == event_ticket_type_id)
     )
-    row = (await db.execute(stmt).tuples().first())
+    result = await db.execute(stmt)
+    row = result.tuples().first()
+
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event ticket type not found")
 
