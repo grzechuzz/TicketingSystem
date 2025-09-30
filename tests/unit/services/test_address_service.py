@@ -1,4 +1,6 @@
 import pytest
+from app.core.pagination import PageDTO
+from app.domain.addresses.schemas import AddressesQueryDTO, AddressReadDTO
 from fastapi import HTTPException, status
 from app.services import address_service
 from tests.helper import create_role
@@ -31,22 +33,44 @@ async def test_get_address_not_found_raises_404(mocker):
 
     assert e.value.status_code == status.HTTP_404_NOT_FOUND
 
-# TODO
-"""
+
 @pytest.mark.asyncio
 async def test_list_addresses_returns_addresses(mocker):
-    addresses = [mocker.Mock(), mocker.Mock()]
-    spy = mocker.patch(
+    addresses_raw = [
+        {"id": 1, "city": "A", "street": "B", "postal_code": "42-191",
+         "building_number": "1", "apartment_number": None, "country_code": "TS"},
+        {"id": 2, "city": "A", "street": "C", "postal_code": "42-191",
+         "building_number": "1", "apartment_number": "22", "country_code": "TS"}
+    ]
+    crud = mocker.patch(
         "app.services.address_service.crud.list_all_addresses",
-        new=mocker.AsyncMock(return_value=addresses)
+        new=mocker.AsyncMock(return_value=(addresses_raw, 2))
     )
     db = mocker.Mock()
+    query = AddressesQueryDTO(page=1, page_size=20)
 
-    result = await address_service.list_addresses(db)
+    page = await address_service.list_addresses(db, query)
 
-    assert result == addresses
-    spy.assert_awaited_once_with(db)
-"""
+    crud.assert_awaited_once_with(db, 1, 20)
+    assert isinstance(page, PageDTO)
+    assert page.page == 1
+    assert page.total == 2
+    assert page.page_size == 20
+    assert all(isinstance(item, AddressReadDTO) for item in page.items)
+
+
+@pytest.mark.asyncio
+async def test_list_addresses_empty_page(mocker):
+    mocker.patch(
+        "app.services.address_service.crud.list_all_addresses",
+        new=mocker.AsyncMock(return_value=([], 0)),
+    )
+
+    page = await address_service.list_addresses(mocker.Mock(), AddressesQueryDTO(page=1, page_size=20))
+
+    assert page.items == []
+    assert page.total == 0
+
 
 @pytest.mark.asyncio
 async def test_create_address_returns_address(mocker):
@@ -59,12 +83,14 @@ async def test_create_address_returns_address(mocker):
     db.flush = mocker.AsyncMock()
     dto = mocker.Mock()
     dto.model_dump.return_value = {"test": "test"}
+    role_customer = create_role(mocker, "CUSTOMER")
+    user = mocker.Mock(roles=[role_customer])
+    request = mocker.Mock()
 
-    result = await address_service.create_address(db, dto)
+    result = await address_service.create_address(db, dto, user, request)
 
     assert result is address
     db.flush.assert_awaited_once_with()
-    dto.model_dump.assert_called_once_with(exclude_none=True)
 
 
 @pytest.mark.asyncio
@@ -136,7 +162,10 @@ async def test_update_address_returns_address(mocker):
     mocker.patch("app.services.address_service.crud.update_address", new=mocker.AsyncMock(return_value=address))
     current_user = mocker.Mock()
     db = mocker.Mock()
+    db.flush = mocker.AsyncMock()
+    request = mocker.Mock()
 
-    result = await address_service.update_address(db, dto, 1, current_user)
+    result = await address_service.update_address(db, dto, 1, current_user, request)
 
     assert result is address
+    assert db.flush.await_count == 1
