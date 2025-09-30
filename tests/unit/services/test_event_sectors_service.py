@@ -52,10 +52,12 @@ async def test_create_event_sector_venue_mismatch_raises_400(mocker):
     sector = mocker.Mock(venue_id=999, is_ga=False)
     schema = mocker.Mock()
     db = mocker.Mock()
+    user = mocker.Mock()
+    req = mocker.Mock()
     mocker.patch("app.services.event_sectors_service.get_sector", new=mocker.AsyncMock(return_value=sector))
 
     with pytest.raises(HTTPException) as e:
-        await event_sectors_service.create_event_sector(db, schema, event)
+        await event_sectors_service.create_event_sector(db, schema, event, user, req)
 
     assert e.value.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -74,8 +76,10 @@ async def test_create_event_sector_ga_sets_tickets_left_and_flushes(mocker):
     )
     db = mocker.Mock()
     db.flush = mocker.AsyncMock()
+    user = mocker.Mock()
+    req = mocker.Mock()
 
-    result = await event_sectors_service.create_event_sector(db, schema, event)
+    result = await event_sectors_service.create_event_sector(db, schema, event, user, req)
 
     assert result is created
     create_spy.assert_awaited_once_with(
@@ -99,8 +103,10 @@ async def test_create_event_sector_non_ga_does_not_set_tickets_left(mocker):
     )
     db = mocker.Mock()
     db.flush = mocker.AsyncMock()
+    user = mocker.Mock()
+    req = mocker.Mock()
 
-    result = await event_sectors_service.create_event_sector(db, schema, event)
+    result = await event_sectors_service.create_event_sector(db, schema, event, user, req)
 
     assert result is created
     create_spy.assert_awaited_once_with(
@@ -120,9 +126,11 @@ async def test_create_event_sector_integrity_error_maps_to_409_raise(mocker):
     mocker.patch("app.services.event_sectors_service.crud.create_event_sector", new=mocker.AsyncMock())
     db = mocker.Mock()
     db.flush = mocker.AsyncMock(side_effect=IntegrityError("dup", None, None))
+    user = mocker.Mock()
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await event_sectors_service.create_event_sector(db, schema, event)
+        await event_sectors_service.create_event_sector(db, schema, event, user, req)
 
     assert e.value.status_code == status.HTTP_409_CONFLICT
     assert e.value.detail == "Sector already assigned to this event"
@@ -148,8 +156,10 @@ async def test_bulk_create_event_sectors_mixed_payload(mocker):
     schema = mocker.Mock(sectors=[sec1, sec2])
     bulk_spy = mocker.patch("app.services.event_sectors_service.crud.bulk_add_event_sectors", new=mocker.AsyncMock())
     db = mocker.Mock()
+    user = mocker.Mock()
+    req = mocker.Mock()
 
-    await event_sectors_service.bulk_create_event_sectors(db, schema, event)
+    await event_sectors_service.bulk_create_event_sectors(db, schema, event, user, req)
 
     bulk_spy.assert_awaited_once_with(
         db,
@@ -176,9 +186,11 @@ async def test_bulk_create_event_sectors_venue_mismatch_stops_bulk_create_raises
     schema = mocker.Mock(sectors=[sec1, sec2])
     bulk_spy = mocker.patch("app.services.event_sectors_service.crud.bulk_add_event_sectors", new=mocker.AsyncMock())
     db = mocker.Mock()
+    user = mocker.Mock()
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await event_sectors_service.bulk_create_event_sectors(db, schema, event)
+        await event_sectors_service.bulk_create_event_sectors(db, schema, event, user, req)
 
     assert e.value.status_code == status.HTTP_400_BAD_REQUEST
     get_sector_spy.assert_awaited_once()
@@ -195,11 +207,13 @@ async def test_delete_event_sector_ok(mocker):
     delete_spy = mocker.patch("app.services.event_sectors_service.crud.delete_event_sector", new=mocker.AsyncMock())
     db = mocker.Mock()
     db.flush = mocker.AsyncMock()
+    user = mocker.Mock()
+    req = mocker.Mock()
 
-    await event_sectors_service.delete_event_sector(db, 1, 1)
+    await event_sectors_service.delete_event_sector(db, 1, 1, user, req)
 
     get_sector_spy.assert_awaited_once_with(db, 1, 1)
-    delete_spy.assert_awaited_once_with(db, event_sector)
+    delete_spy.assert_called_once_with(db, event_sector)
     db.flush.assert_awaited_once()
 
 
@@ -209,9 +223,11 @@ async def test_delete_event_sector_integrity_error_raises_409(mocker):
     mocker.patch("app.services.event_sectors_service.crud.delete_event_sector", new=mocker.AsyncMock())
     db = mocker.Mock()
     db.flush = mocker.AsyncMock(side_effect=IntegrityError("fk", None, None))
+    user = mocker.Mock()
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await event_sectors_service.delete_event_sector(db, 1, 1)
+        await event_sectors_service.delete_event_sector(db, 1, 1, user, req)
 
     assert e.value.status_code == status.HTTP_409_CONFLICT
     assert e.value.detail == "Event sector in use"
