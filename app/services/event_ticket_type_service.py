@@ -135,7 +135,7 @@ async def delete_event_ticket_type(
         event_id=event_id,
         meta={"event_sector_id": event_ticket_type.event_sector_id}
     ) as span:
-        crud.delete_event_ticket_type(db, event_ticket_type)
+        await crud.delete_event_ticket_type(db, event_ticket_type)
         try:
             await db.flush()
         except IntegrityError:
