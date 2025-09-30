@@ -21,9 +21,10 @@ async def test_reserve_ticket_when_prechecks_fail_raise_errors(mocker, exception
     db = mocker.Mock()
     user = mocker.Mock()
     user.id = 123
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await booking_service.reserve_ticket(db, user, event_id=1, event_ticket_type_id=2, seat_id=None)
+        await booking_service.reserve_ticket(db, user, event_id=1, event_ticket_type_id=2, request=req, seat_id=None)
 
     assert e.value.status_code == exception.status_code
     ett_spy.assert_not_awaited()
@@ -39,9 +40,10 @@ async def test_reserve_ticket_when_order_in_awaiting_payment_status_raises_409(m
     db = mocker.Mock()
     db.scalar = mocker.AsyncMock(return_value=order)
     user = mocker.Mock()
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await booking_service.reserve_ticket(db, user, event_id=1, event_ticket_type_id=2, seat_id=None)
+        await booking_service.reserve_ticket(db, user, event_id=1, event_ticket_type_id=2, seat_id=None, request=req)
 
     assert e.value.status_code == status.HTTP_409_CONFLICT
     ett_spy.assert_not_awaited()
@@ -66,9 +68,10 @@ async def test_reserve_ticket_when_ticket_type_does_not_match_event_raises_400(m
     db.scalar = mocker.AsyncMock(return_value=None)
     db.execute = mocker.AsyncMock()
     user = mocker.Mock()
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await booking_service.reserve_ticket(db, user, 1, 2, seat_id)
+        await booking_service.reserve_ticket(db, user, 1, 2, req, seat_id)
 
     assert e.value.status_code == status.HTTP_400_BAD_REQUEST
     assert e.value.detail == message
@@ -106,9 +109,10 @@ async def test_reserve_ticket_inserts_and_fetches_pending_order_but_exceeds_tick
     )
     ga_decrement_spy = mocker.patch("app.services.booking_service._ga_decrement", new=mocker.AsyncMock())
     user = mocker.Mock()
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await booking_service.reserve_ticket(db, user, 1, 1, None)
+        await booking_service.reserve_ticket(db, user, 1, 1, req, None)
 
     assert e.value.status_code == status.HTTP_400_BAD_REQUEST
     req_order.assert_awaited_once()
@@ -147,9 +151,10 @@ async def test_reserve_ticket_ga_no_tickets_left_raises_409(mocker):
     )
     bump_total_spy = mocker.patch("app.services.booking_service._bump_total", new=mocker.Mock())
     user = mocker.Mock()
+    req = mocker.Mock()
 
     with pytest.raises(HTTPException) as e:
-        await booking_service.reserve_ticket(db, user, 1, 1, None)
+        await booking_service.reserve_ticket(db, user, 1, 1, req, None)
 
     assert e.value.status_code == status.HTTP_409_CONFLICT
     ga_decrement.assert_awaited_once_with(db, event_sector.id)
@@ -194,8 +199,11 @@ async def test_reserve_ticket_ga_successful_reservation(mocker):
     )
     user = mocker.Mock()
     user.id = 10
+    req = mocker.Mock()
 
-    returned_order, returned_ticket_instance = await booking_service.reserve_ticket(db, user, 1, 1, None)
+    returned_order, returned_ticket_instance = await booking_service.reserve_ticket(
+        db, user, 1, 1, req, None
+    )
 
     assert returned_order is order
     assert returned_order.reserved_until == initial_reserved + timedelta(minutes=15)
@@ -244,10 +252,11 @@ async def test_reserve_ticket_seated_selected_seat_not_available_raises_409(mock
     seat_check_spy = mocker.patch("app.services.booking_service._require_seat_in_sector", new=mocker.AsyncMock())
 
     user = mocker.Mock()
+    req = mocker.Mock()
     seat_id = 555
 
     with pytest.raises(HTTPException) as e:
-        await booking_service.reserve_ticket(db, user, 1, 1, seat_id)
+        await booking_service.reserve_ticket(db, user, 1, 1, req, seat_id)
 
     assert e.value.status_code == status.HTTP_409_CONFLICT
     assert e.value.detail == "Selected seat is not available"
@@ -295,9 +304,10 @@ async def test_reserve_ticket_seated_successful_reservation(mocker):
     seat_check_spy = mocker.patch("app.services.booking_service._require_seat_in_sector", new=mocker.AsyncMock())
 
     user = mocker.Mock()
+    req = mocker.Mock()
     seat_id = 777
 
-    returned_order, returned_ticket_instance = await booking_service.reserve_ticket(db, user, 1, 1, seat_id)
+    returned_order, returned_ticket_instance = await booking_service.reserve_ticket(db, user, 1, 1, req, seat_id)
 
     assert returned_order is order
     assert returned_order.reserved_until == initial_reserved + timedelta(minutes=15)
@@ -368,11 +378,29 @@ async def test_reserve_ticket_seated_seat_validation_errors_propagate(mocker, co
         new=mocker.AsyncMock(),
     )
 
+    user = mocker.Mock()
+    req = mocker.Mock()
+
     with pytest.raises(HTTPException) as e:
-        await booking_service.reserve_ticket(db, mocker.Mock(), event_id=1, event_ticket_type_id=1, seat_id=777)
+        await booking_service.reserve_ticket(db, user, 1, 1, req, 777)
 
     assert e.value.status_code == code
     seat_check.assert_awaited_once_with(db, 777, event_sector.sector_id)
     db.add.assert_not_called()
     db.flush.assert_not_awaited()
     ga_decrement.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_remove_ticket_instance_ticket_instance_not_found_raises_404(mocker):
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(return_value=None)
+    user = mocker.Mock()
+    req = mocker.Mock()
+    req_order = mocker.patch("app.services.booking_service._require_order", new=mocker.AsyncMock())
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.remove_ticket_instance(db, user, 1, req)
+
+    assert e.value.status_code == status.HTTP_404_NOT_FOUND
+    req_order.assert_not_awaited()
