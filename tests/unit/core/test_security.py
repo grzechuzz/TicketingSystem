@@ -27,11 +27,16 @@ def test_verify_password_false_for_incorrect():
 def test_create_access_token_contains_expected_claims(monkeypatch):
     monkeypatch.setattr(security, "SECRET_KEY", "fake-key")
 
-    token = security.create_access_token(subject=1, roles=["ADMIN", "CUSTOMER"])
-    payload = jwt.decode(token, "fake-key", algorithms=[security.ALGORITHM])
+    token = security.create_access_token(subject=1)
+    payload = jwt.decode(
+        token,
+        "fake-key",
+        algorithms=[security.ALGORITHM],
+        issuer=security.JWT_ISSUER,
+        audience=security.JWT_AUDIENCE
+    )
 
     now = datetime.now(timezone.utc)
     assert payload["iat"] == int(now.timestamp())
-    assert payload["exp"] == int((now + timedelta(minutes=30)).timestamp())
-    assert payload["roles"] == ["ADMIN", "CUSTOMER"]
+    assert payload["exp"] == int((now + timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)).timestamp())
     assert payload["sub"] == '1'
