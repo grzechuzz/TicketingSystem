@@ -389,3 +389,18 @@ async def test_reserve_ticket_seated_seat_validation_errors_propagate(mocker, co
     db.add.assert_not_called()
     db.flush.assert_not_awaited()
     ga_decrement.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_remove_ticket_instance_ticket_instance_not_found_raises_404(mocker):
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(return_value=None)
+    user = mocker.Mock()
+    req = mocker.Mock()
+    req_order = mocker.patch("app.services.booking_service._require_order", new=mocker.AsyncMock())
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.remove_ticket_instance(db, user, 1, req)
+
+    assert e.value.status_code == status.HTTP_404_NOT_FOUND
+    req_order.assert_not_awaited()
