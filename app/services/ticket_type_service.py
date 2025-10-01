@@ -48,7 +48,7 @@ async def delete_ticket_type(db: AsyncSession, ticket_type_id: int, user: User, 
         object_id=ticket_type_id,
     ):
         ticket_type = await get_ticket_type(db, ticket_type_id)
-        crud.delete_ticket_type(db, ticket_type)
+        await crud.delete_ticket_type(db, ticket_type)
         try:
             await db.flush()
         except IntegrityError:

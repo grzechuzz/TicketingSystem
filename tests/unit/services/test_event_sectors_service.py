@@ -213,7 +213,7 @@ async def test_delete_event_sector_ok(mocker):
     await event_sectors_service.delete_event_sector(db, 1, 1, user, req)
 
     get_sector_spy.assert_awaited_once_with(db, 1, 1)
-    delete_spy.assert_called_once_with(db, event_sector)
+    delete_spy.assert_awaited_once_with(db, event_sector)
     db.flush.assert_awaited_once()
 
 

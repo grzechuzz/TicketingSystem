@@ -102,5 +102,5 @@ async def update_seat(seat: Seat, data: dict) -> Seat:
     return seat
 
 
-def delete_seat(db: AsyncSession, seat: Seat) -> None:
-    db.delete(seat)
+async def delete_seat(db: AsyncSession, seat: Seat) -> None:
+    await db.delete(seat)

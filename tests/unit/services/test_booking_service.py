@@ -1,10 +1,11 @@
 import pytest
 import time_machine
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from decimal import Decimal
 from app.services import booking_service
+from app.domain.booking.models import TicketHolder
 
 
 @pytest.mark.asyncio
@@ -404,3 +405,212 @@ async def test_remove_ticket_instance_ticket_instance_not_found_raises_404(mocke
 
     assert e.value.status_code == status.HTTP_404_NOT_FOUND
     req_order.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_remove_ticket_instance_order_not_found_raises_404(mocker):
+    ti = mocker.Mock()
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(return_value=ti)
+    user = mocker.Mock()
+    req = mocker.Mock()
+    req_order = mocker.patch(
+        "app.services.booking_service._require_order",
+        new=mocker.AsyncMock(side_effect=HTTPException(status_code=status.HTTP_404_NOT_FOUND))
+    )
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.remove_ticket_instance(db, user, 1, req)
+
+    assert e.value.status_code == status.HTTP_404_NOT_FOUND
+    assert db.scalar.call_count == 1
+    req_order.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_remove_ticket_instance_when_ticket_instance_not_found_in_order_raises_404(mocker):
+    ti = mocker.Mock(order_id=1)
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(return_value=ti)
+    user = mocker.Mock()
+    req = mocker.Mock()
+    order = mocker.AsyncMock(id=2)
+    req_order = mocker.patch("app.services.booking_service._require_order", new=order)
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.remove_ticket_instance(db, user, 1, req)
+
+    assert e.value.status_code == status.HTTP_404_NOT_FOUND
+    assert db.scalar.call_count == 1
+    req_order.assert_awaited_once()
+
+
+@pytest.mark.parametrize("is_ga", [True, False])
+@pytest.mark.asyncio
+async def test_remove_ticket_instance_depending_sector_is_ga(mocker, is_ga):
+    db = mocker.Mock()
+    db.delete = mocker.AsyncMock()
+    db.flush = mocker.AsyncMock()
+    ti = mocker.Mock(order_id=1, price_gross_snapshot=10)
+    sector = mocker.Mock(is_ga=is_ga)
+    event_sector = mocker.Mock(sector=sector)
+    ett = mocker.Mock(event_sector=event_sector, event_sector_id=1)
+    db.scalar = mocker.AsyncMock(side_effect=[ti, ett])
+    order = mocker.Mock(id=1)
+    req_order = mocker.patch("app.services.booking_service._require_order", new=mocker.AsyncMock(return_value=order))
+    ga_increment = mocker.patch("app.services.booking_service._ga_increment", new=mocker.AsyncMock())
+    bump_total = mocker.patch("app.services.booking_service._bump_total", new=mocker.Mock())
+    user = mocker.Mock()
+    req = mocker.Mock()
+
+    await booking_service.remove_ticket_instance(db, user, 1, req)
+
+    if is_ga:
+        ga_increment.assert_awaited_once_with(db, ett.event_sector_id, 1)
+    else:
+        ga_increment.assert_not_awaited()
+
+    bump_total.assert_called_once_with(order, -ti.price_gross_snapshot)
+    assert db.scalar.call_count == 2
+    req_order.assert_awaited_once()
+    db.delete.assert_awaited_once_with(ti)
+    db.flush.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_upsert_ticket_holder_when_ticket_instance_not_found_raises_404(mocker):
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(return_value=None)
+    schema = mocker.Mock()
+    schema.model_dump = mocker.Mock(return_value={})
+    user = mocker.Mock()
+    req = mocker
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.upsert_ticket_holder(db, 1, schema, user, req)
+
+    assert e.value.status_code == status.HTTP_404_NOT_FOUND
+    db.scalar.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_upsert_ticket_holder_when_holder_is_not_required_raises_400(mocker):
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(side_effect=[mocker.AsyncMock(), False])
+    db.flush = mocker.AsyncMock()
+    schema = mocker.Mock()
+    schema.model_dump = mocker.Mock(return_value={})
+    user = mocker.Mock()
+    req = mocker.Mock()
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.upsert_ticket_holder(db, 1, schema, user, req)
+
+    assert e.value.status_code == status.HTTP_400_BAD_REQUEST
+    assert db.scalar.call_count == 2
+    db.flush.assert_not_awaited()
+
+@pytest.mark.parametrize(("ticket_holder_exi", "db_add_exec"), [
+    (True, 0),
+    (False, 1)
+])
+@pytest.mark.asyncio
+async def test_upsert_ticket_holder_depending_on_whether_holder_already_exists(mocker, ticket_holder_exi, db_add_exec):
+    ti = mocker.AsyncMock(ticket_holder=mocker.Mock() if ticket_holder_exi else None, order_id=1, event_id=1)
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(side_effect=[ti, True])
+    db.add = mocker.Mock()
+    db.flush = mocker.AsyncMock()
+    schema = mocker.Mock(
+        first_name='Karl', last_name='Sand', birth_date=date(1999, 1, 1), identification_number="99183940231"
+    )
+    schema.model_dump = mocker.Mock(
+        return_value={
+            "first_name": 'Karl',
+            "last_name": 'Sand',
+            "birth_date": date(1999, 1, 1),
+            "identification_number": "99183940231"
+        }
+    )
+    user = mocker.Mock()
+    req = mocker.Mock()
+
+    await booking_service.upsert_ticket_holder(db, 1, schema, user, req)
+
+    assert db.add.call_count == db_add_exec
+    assert db.scalar.call_count == 2
+    db.flush.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_set_invoice_requested(mocker):
+    order = mocker.Mock(id=1)
+    mocker.patch("app.services.booking_service._require_order", new=mocker.AsyncMock(return_value=order))
+    db = mocker.Mock()
+    db.flush = mocker.AsyncMock()
+    schema = mocker.Mock(invoice_requested=True)
+    user = mocker.Mock()
+    req = mocker.Mock()
+
+    await booking_service.set_invoice_requested(db, schema, user, req)
+
+    assert order.invoice_requested is True
+    db.flush.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_upsert_invoice_when_invoice_not_requested_raises_400(mocker):
+    order = mocker.Mock(invoice_requested=False)
+    mocker.patch("app.services.booking_service._require_order", new=mocker.AsyncMock(return_value=order))
+    schema = mocker.Mock()
+    schema.model_dump = mocker.Mock(return_value={})
+    db = mocker.Mock()
+    db.flush = mocker.AsyncMock()
+    user = mocker.Mock()
+    req = mocker.Mock()
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.upsert_invoice(db, schema, user, req)
+
+    assert e.value.status_code == status.HTTP_400_BAD_REQUEST
+    db.flush.assert_not_awaited()
+
+
+@pytest.mark.parametrize(("invoice_exi", "db_add_exec"), [
+    (True, 0),
+    (False, 1)
+])
+@pytest.mark.asyncio
+async def test_upsert_invoice_depending_on_whether_invoice_already_exists(mocker, invoice_exi, db_add_exec):
+    invoice = mocker.Mock()
+    order = mocker.Mock(id=1, invoice_requested=True, invoice=invoice if invoice_exi else None)
+    mocker.patch("app.services.booking_service._require_order", new=mocker.AsyncMock(return_value=order))
+    schema = mocker.Mock()
+    schema.model_dump = mocker.Mock(return_value={})
+    db = mocker.Mock()
+    db.flush = mocker.AsyncMock()
+    db.add = mocker.Mock()
+    user = mocker.Mock()
+    req = mocker.Mock()
+
+    await booking_service.upsert_invoice(db, schema, user, req)
+
+    assert db.add.call_count == db_add_exec
+    db.flush.assert_awaited_once()
+
+
+@time_machine.travel("2025-01-01T12:00:00Z", tick=False)
+@pytest.mark.asyncio
+async def test_process_order_expired_reservation_raises_409(mocker):
+    user = mocker.Mock(id=1)
+    order = mocker.AsyncMock(reserved_until=datetime(2025, 1, 1, 11, 0, 0, tzinfo=timezone.utc))
+    mocker.patch("app.services.booking_service._require_order", new=mocker.AsyncMock(return_value=order))
+    db = mocker.Mock()
+    require_cart_spy = mocker.patch(
+        "app.services.booking_service._require_cart_has_items", new=mocker.AsyncMock(return_value=True)
+    )
+
+    with pytest.raises(HTTPException) as e:
+        await booking_service.process_order(db, user)
+
+    assert e.value.status_code == status.HTTP_409_CONFLICT
+    require_cart_spy.assert_not_awaited()

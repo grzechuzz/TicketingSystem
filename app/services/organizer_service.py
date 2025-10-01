@@ -86,4 +86,4 @@ async def delete_organizer(db: AsyncSession, organizer_id: int, user: User, requ
         object_id=organizer_id
     ):
         organizer = await get_organizer(db, organizer_id)
-        crud.delete_organizer(db, organizer)
+        await crud.delete_organizer(db, organizer)
