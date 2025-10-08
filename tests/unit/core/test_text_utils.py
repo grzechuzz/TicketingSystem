@@ -1,5 +1,5 @@
 import pytest
-from app.core.text_utils import strip_text
+from app.core.utils.text_utils import strip_text
 
 
 @pytest.mark.parametrize(
