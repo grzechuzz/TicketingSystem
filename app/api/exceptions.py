@@ -103,5 +103,5 @@ def register_error_handler(app: FastAPI) -> None:
             title=title,
             detail=detail,
             extra=extra,
-            headers=headers,
+            headers=headers
         )
