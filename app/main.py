@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+
+from app.api.exceptions import register_error_handler
 from app.api.v1.routes import (auth, addresses, organizers, venues, sectors, events, seats, ticket_types,
                                event_ticket_types, booking, cart, payment_methods, payments, orders, invoices,
                                tickets, users, admin_maintenance)
@@ -17,6 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware, header_name="X-Request-ID")
+register_error_handler(app)
 app.include_router(auth.router)
 app.include_router(addresses.router)
 app.include_router(organizers.router)
