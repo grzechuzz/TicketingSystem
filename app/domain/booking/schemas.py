@@ -2,7 +2,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, EmailStr, AliasChoices, AliasPath
 from app.domain.booking.models import OrderStatus, InvoiceType, TicketStatus
-from app.core.text_utils import strip_text
+from app.core.utils.text_utils import strip_text
 from app.domain.payments.schemas import PaymentInOrderDTO
 
 

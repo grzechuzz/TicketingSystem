@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
-from app.core.text_utils import strip_text
+from app.core.utils.text_utils import strip_text
 
 
 class VenueCreateDTO(BaseModel):

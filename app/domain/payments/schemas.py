@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from app.core.text_utils import strip_text
+from app.core.utils.text_utils import strip_text
 from decimal import Decimal
 from app.domain.payments.models import PaymentStatus
 

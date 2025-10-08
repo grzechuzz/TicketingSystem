@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
 from app.domain.events.models import EventStatus
-from app.core.text_utils import strip_text
+from app.core.utils.text_utils import strip_text
 
 
 class EventCreateDTO(BaseModel):
