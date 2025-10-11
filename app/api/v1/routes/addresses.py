@@ -1,9 +1,10 @@
-from fastapi import APIRouter, status, Depends, Response, Request
+from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.users.models import User
+from app.domain.addresses.models import Address
 from app.core.database import get_db
 from app.core.pagination import PageDTO
 from app.core.dependencies.auth import get_current_user_with_roles
+from app.core.dependencies.addresses import require_authorized_address
 from app.services import address_service
 from app.domain.addresses.schemas import AddressCreateDTO, AddressReadDTO, AddressPutDTO, AddressesQueryDTO
 from typing import Annotated
@@ -17,16 +18,11 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=AddressReadDTO,
-    response_model_exclude_none=True
+    response_model_exclude_none=True,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))]
 )
-async def create_address(
-        schema: AddressCreateDTO,
-        db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER'))],
-        response: Response,
-        request: Request
-):
-    address = await address_service.create_address(db, schema, user, request)
+async def create_address(schema: AddressCreateDTO, db: db_dependency, response: Response):
+    address = await address_service.create_address(db, schema)
     response.headers["Location"] = f"{router.prefix}/{address.id}"
     return address
 
@@ -59,11 +55,9 @@ async def get_address(address_id: int, db: db_dependency):
     response_model=AddressReadDTO
 )
 async def update_address(
-        address_id: int,
+        address: Annotated[Address, Depends(require_authorized_address)],
         schema: AddressPutDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN', 'ORGANIZER'))],
-        request: Request
 ):
-    address = await address_service.update_address(db, schema, address_id, user, request)
-    return address
+    return await address_service.update_address(db, schema, address)
+
