@@ -11,6 +11,7 @@ from app.core.config import SECRET_KEY, JWT_ISSUER, JWT_AUDIENCE
 from app.domain.users.models import User
 from app.domain.auth.schemas import TokenPayload
 from app.domain.exceptions import Unauthorized, Forbidden
+from app.core.ctx import AUTH_ROLES_CTX, AUTH_USER_ID_CTX
 
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -34,6 +35,8 @@ async def get_token_payload(token: Annotated[str, Depends(oauth2_bearer)]) -> To
 
 
 def get_current_user_with_roles(*allowed_roles: str):
+    allowed = set(allowed_roles)
+
     async def _inner(payload: Annotated[TokenPayload, Depends(get_token_payload)],
                      db: Annotated[AsyncSession, Depends(get_db)]) -> User:
         stmt = select(User).where(User.id == int(payload.sub), User.is_active.is_(True))
@@ -43,7 +46,10 @@ def get_current_user_with_roles(*allowed_roles: str):
             raise Unauthorized("User not found", ctx={"user_id": payload.sub})
 
         roles = {r.name for r in user.roles}
-        if allowed_roles and roles.isdisjoint(allowed_roles):
+        AUTH_ROLES_CTX.set(roles)
+        AUTH_USER_ID_CTX.set(user.id)
+
+        if allowed and roles.isdisjoint(allowed):
             raise Forbidden("Permission denied", ctx={"required": allowed_roles, "user_roles": list(roles)})
         return user
     return _inner
