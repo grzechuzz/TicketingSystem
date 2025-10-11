@@ -19,3 +19,5 @@ class InvalidInput(AppError):
     pass
 class Unprocessable(AppError):
     pass
+class InternalError(AppError):
+    pass
