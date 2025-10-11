@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from typing import Annotated, NamedTuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,8 @@ async def _ensure_event_owner(event_id: int, db: AsyncSession, user: User) -> Ev
     if not event:
         raise NotFound("Event not found", ctx={"event_id": event_id})
 
-    if any(r.name == "ADMIN" for r in user.roles):
+    roles = {r.name for r in user.roles}
+    if "ADMIN" in roles:
         return event
 
     if event.organizer_id not in {o.id for o in user.organizers}:
@@ -82,7 +83,7 @@ async def require_event_ticket_type_access(
     row = result.tuples().first()
 
     if not row:
-        raise NotFound()
+        raise NotFound("Event ticket type not found", ctx={"event_ticket_type_id": event_ticket_type_id})
 
     event_ticket_type, event_id = row
     await _ensure_event_owner(event_id, db=db, user=user)
