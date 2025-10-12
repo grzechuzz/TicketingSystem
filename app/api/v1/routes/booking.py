@@ -23,16 +23,14 @@ async def reserve_ticket(
         schema: ReserveTicketRequestDTO,
         db: db_dependency,
         user: Annotated[User, Depends(get_current_user_with_roles("CUSTOMER", "ADMIN"))],
-        response: Response,
-        request: Request
+        response: Response
 ):
     order, ticket_instance = await booking_service.reserve_ticket(
         db=db,
         user=user,
         event_id=event_id,
         event_ticket_type_id=schema.event_ticket_type_id,
-        seat_id=schema.seat_id,
-        request=request
+        seat_id=schema.seat_id
     )
 
     response.headers["Location"] = f"/users/me/orders/{order.id}"
