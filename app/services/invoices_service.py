@@ -1,7 +1,6 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from decimal import Decimal
-from fastapi import HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
@@ -12,6 +11,7 @@ from app.domain.booking.schemas import UserInvoicesQueryDTO, InvoiceListItemDTO,
     AdminInvoicesQueryDTO, AdminInvoiceListItemDTO
 from app.domain.users.models import User
 from app.domain.events.models import Event
+from app.domain.exceptions import NotFound
 
 
 TZ = ZoneInfo("Europe/Warsaw")
@@ -126,7 +126,7 @@ async def _get_invoice_and_order_id(
     )
     result = row.first()
     if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+        raise NotFound("Invoice not found", ctx={"invoice_id": invoice_id})
     invoice, order_id = result
     return invoice, order_id
 
