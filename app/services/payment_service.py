@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from fastapi import HTTPException, status, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +11,7 @@ from app.services.invoices_service import issue_invoice_for_order
 from app.core.auditing import AuditSpan
 import uuid
 import hashlib
+from app.domain.exceptions import NotFound, Conflict, InvalidInput
 
 
 def _redirect_url(payment: Payment, idempotency_key: str) -> str:
@@ -20,11 +20,11 @@ def _redirect_url(payment: Payment, idempotency_key: str) -> str:
 
 def _normalize_uuid4(key: str) -> str:
     if not key or not key.strip():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Idempotency key is required")
+        raise InvalidInput("Idempotency key is required")
     try:
         u = uuid.UUID(key.strip(), version=4)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Idempotency key must be UUIDv4")
+    except ValueError as e:
+        raise InvalidInput("Idempotency key must be UUIDv4") from e
     return str(u)
 
 
@@ -47,11 +47,60 @@ async def _issue_tickets(db: AsyncSession, order: Order) -> int:
     return cnt
 
 
+async def _require_payment_method(db: AsyncSession, pm_id: int) -> PaymentMethod:
+    pm = await crud.get_payment_method(db, pm_id)
+    if not pm:
+        raise NotFound("Payment method not found", ctx={"payment_method_id": pm_id})
+    return pm
+
+
+async def _require_active_payment_method(db: AsyncSession, pm_id: int) -> PaymentMethod:
+    pm = await _require_payment_method(db, pm_id)
+    if not pm.is_active:
+        raise NotFound("Payment method not found", ctx={"payment_method_id": pm_id, "inactive": True})
+    return pm
+
+
+async def _require_awaiting_order(db: AsyncSession, user_id: int) -> Order:
+    order = await db.scalar(
+        select(Order)
+        .where(Order.user_id == user_id, Order.status == OrderStatus.AWAITING_PAYMENT)
+        .with_for_update()
+    )
+    if not order:
+        raise NotFound("No order awaiting payment", ctx={"user_id": user_id})
+
+    now = datetime.now(timezone.utc)
+    if order.reserved_until < now:
+        raise Conflict(
+            "Reservation expired",
+            ctx={"order_id": order.id, "reserved_until": order.reserved_until.isoformat()}
+        )
+    if order.total_price is None or order.total_price <= 0:
+        raise InvalidInput(
+            "Order total must be greater than zero",
+            ctx={"order_id": order.id, "total_price": str(order.total_price)}
+        )
+
+    return order
+
+
+async def _require_payment_for_user(db: AsyncSession, payment_id: int, user_id: int, *, for_update: bool = False) -> Payment:
+    stmt = (
+        select(Payment)
+        .join(Order)
+        .where(Payment.id == payment_id, Order.user_id == user_id)
+    )
+    if for_update:
+        stmt = stmt.with_for_update()
+    payment = await db.scalar(stmt)
+    if not payment:
+        raise NotFound("Payment not found", ctx={"payment_id": payment_id, "user_id": user_id})
+    return payment
+
+
 async def get_payment_method(db: AsyncSession, payment_method_id: int) -> PaymentMethod:
-    payment_method = await crud.get_payment_method(db, payment_method_id)
-    if not payment_method:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment method not found")
-    return payment_method
+    return await _require_payment_method(db, payment_method_id)
 
 
 async def list_all_payment_methods(db: AsyncSession) -> list[PaymentMethod]:
@@ -62,21 +111,19 @@ async def list_active_payment_methods(db: AsyncSession) -> list[PaymentMethod]:
     return await crud.list_active_payment_methods(db)
 
 
-async def create_payment_method(db: AsyncSession, schema: PaymentMethodCreateDTO, user: User, request: Request) -> PaymentMethod:
+async def create_payment_method(db: AsyncSession, schema: PaymentMethodCreateDTO) -> PaymentMethod:
     fields = list(schema.model_dump(exclude_none=True).keys())
     async with AuditSpan(
-        request,
         scope="PAYMENT_METHODS",
         action="CREATE",
-        user=user,
         object_type="payment_method",
         meta={"fields": fields}
     ) as span:
         payment_method = await crud.create_payment_method(db, schema.model_dump(exclude_none=True))
         try:
             await db.flush()
-        except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment method already exists")
+        except IntegrityError as e:
+            raise Conflict("Payment method already exists", ctx={"fields": fields}) from e
         span.object_id = payment_method.id
         return payment_method
 
@@ -85,15 +132,11 @@ async def update_payment_method(
         db: AsyncSession,
         payment_method_id: int,
         schema: PaymentMethodUpdateDTO,
-        user: User,
-        request: Request
 ) -> PaymentMethod:
     fields = list(schema.model_dump(exclude_none=True).keys())
     async with AuditSpan(
-        request,
         scope="PAYMENT_METHODS",
         action="UPDATE",
-        user=user,
         object_type="payment_method",
         object_id=payment_method_id,
         meta={"fields": fields}
@@ -102,8 +145,8 @@ async def update_payment_method(
         payment_method = await crud.update_payment_method(payment_method, schema.model_dump(exclude_none=True))
         try:
             await db.flush()
-        except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment method already exists")
+        except IntegrityError as e:
+            raise Conflict("Payment method already exists", ctx={"fields": fields}) from e
         return payment_method
 
 
@@ -111,38 +154,19 @@ async def start_payment(
         db: AsyncSession,
         user: User,
         schema: PaymentCreateDTO,
-        idempotency_key: str,
-        request: Request
+        idempotency_key: str
 ) -> tuple[Payment, str | None]:
     idempotency_key = _normalize_uuid4(idempotency_key)
+    ik_d = _ik_digest(idempotency_key)
 
     async with AuditSpan(
-        request,
         scope="PAYMENTS",
         action="START",
-        user=user,
         object_type="payment",
-        meta={"payment_method_id": schema.payment_method_id, "ik_digest": _ik_digest(idempotency_key)},
+        meta={"payment_method_id": schema.payment_method_id, "ik_digest": ik_d},
     ) as span:
-        order = await db.scalar(
-            select(Order)
-            .where(Order.user_id == user.id, Order.status == OrderStatus.AWAITING_PAYMENT)
-            .with_for_update()
-        )
-        if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No order awaiting payment")
-
-        now = datetime.now(timezone.utc)
-        if order.reserved_until < now:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reservation expired")
-
-        if order.total_price is None or order.total_price <= 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order total must be greater than zero")
-
-        payment_method = await get_payment_method(db, schema.payment_method_id)
-        if not payment_method or not payment_method.is_active:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment method not found")
-
+        order = await _require_awaiting_order(db, user.id)
+        payment_method = await _require_active_payment_method(db, schema.payment_method_id)
         amount = order.total_price
         span.meta.update({"order_id": order.id, "amount": str(amount)})
 
@@ -151,9 +175,14 @@ async def start_payment(
             if (existing_by_key.order_id != order.id or
                     existing_by_key.payment_method_id != payment_method.id or
                     existing_by_key.amount != amount):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Idempotency key reused for different payload"
+                raise Conflict(
+                    "Idempotency key reused for different payload",
+                    ctx={
+                        "payment_id": existing_by_key.id,
+                        "order_id": order.id,
+                        "payment_method_id": payment_method.id,
+                        "amount": str(amount)
+                    }
                 )
 
             span.object_id = existing_by_key.id
@@ -182,9 +211,9 @@ async def start_payment(
                 span.object_id = existing_active.id
                 span.meta.update({"status": existing_active.status, "redirect": False, "reused_active": True})
                 return existing_active, None
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Active payment already exists for this order"
+            raise Conflict(
+                "Active payment already exists for this order",
+                ctx={"order_id": order.id, "payment_id": existing_active.id, "status": existing_active.status},
             )
 
         payment = Payment(
@@ -198,8 +227,11 @@ async def start_payment(
         db.add(payment)
         try:
             await db.flush()
-        except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment already exists for this order")
+        except IntegrityError as e:
+            raise Conflict(
+                "Payment already exists for this order",
+                ctx={"order_id": order.id, "ik_digest": ik_d}
+            ) from e
 
         span.object_id = payment.id
         span.meta.update({"status": payment.status, "redirect": True})
@@ -212,42 +244,22 @@ async def finalize_payment(
         user: User,
         payment_id: int,
         success: bool,
-        request: Request
 ) -> Payment:
-    async with AuditSpan(
-        request,
-        scope="PAYMENTS",
-        action="FINALIZE",
-        user=user,
-        object_type="payment",
-        meta={"success": success}
-    ) as span:
-        payment = await db.scalar(
-            select(Payment)
-            .join(Order)
-            .where(
-                Payment.id == payment_id,
-                Order.user_id == user.id
-            )
-            .with_for_update()
-        )
-        if not payment:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
-
+    async with AuditSpan(scope="PAYMENTS", action="FINALIZE", object_type="payment", meta={"success": success}) as span:
+        payment = await _require_payment_for_user(db, payment_id, user.id, for_update=True)
         span.object_id = payment.id
         span.order_id = payment.order_id
         span.meta.update({"prev_status": payment.status})
 
         order = payment.order
         if not order or order.status != OrderStatus.AWAITING_PAYMENT:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Order not awaiting payment")
+            raise Conflict("Order not awaiting payment", ctx={"order_id": getattr(order, "id", None)})
 
         if payment.status == PaymentStatus.COMPLETED or payment.status == PaymentStatus.FAILED:
             span.meta.update({"new_status": payment.status, "no_op": True})
             return payment
 
         now = datetime.now(timezone.utc)
-
         if success:
             payment.status = PaymentStatus.COMPLETED
             payment.paid_at = now
@@ -274,11 +286,4 @@ async def finalize_payment(
 
 
 async def get_payment_for_user(db: AsyncSession, payment_id: int, user: User) -> Payment:
-    payment = await db.scalar(
-        select(Payment)
-        .join(Order)
-        .where(Payment.id == payment_id, Order.user_id == user.id)
-    )
-    if not payment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
-    return payment
+    return await _require_payment_for_user(db, payment_id, user.id, for_update=False)
