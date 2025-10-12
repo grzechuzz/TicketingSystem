@@ -42,10 +42,9 @@ async def create_payment_method(
         schema: PaymentMethodCreateDTO,
         db: db_dependency,
         user: Annotated[User, admin_dependency],
-        response: Response,
-        request: Request
+        response: Response
 ):
-    payment_method = await payment_service.create_payment_method(db, schema, user, request)
+    payment_method = await payment_service.create_payment_method(db, schema)
     response.headers["Location"] = f"/payment-methods/{payment_method.id}"
     return payment_method
 
@@ -59,7 +58,6 @@ async def update_payment_method(
         payment_method_id: int,
         schema: PaymentMethodUpdateDTO,
         db: db_dependency,
-        user: Annotated[User, admin_dependency],
-        request: Request
+        user: Annotated[User, admin_dependency]
 ):
-    return await payment_service.update_payment_method(db, payment_method_id, schema, user, request)
+    return await payment_service.update_payment_method(db, payment_method_id, schema)
