@@ -1,7 +1,5 @@
-from decimal import Decimal
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException, status
 from app.core.pagination import PageDTO, paginate
 from app.domain.users.models import User
 from app.domain.booking.models import Order, TicketInstance
@@ -9,13 +7,7 @@ from app.domain.payments.models import Payment, PaymentStatus
 from app.domain.booking.schemas import UserOrdersQueryDTO, OrderListItemDTO, OrderDetailsDTO, \
     AdminOrdersQueryDTO, AdminOrderListItemDTO, AdminOrderDetailsDTO
 from app.domain.payments.schemas import PaymentInOrderDTO, PaymentMethodReadDTO
-
-
-def _calc_totals_from_tickets(tickets: list[TicketInstance]) -> tuple[Decimal, Decimal, Decimal]:
-    net = sum((ti.price_net_snapshot for ti in tickets), Decimal('0.00'))
-    gross = sum((ti.price_gross_snapshot for ti in tickets), Decimal('0.00'))
-    vat = gross - net
-    return net, vat, gross
+from app.domain.exceptions import NotFound
 
 
 def _to_order_list_item(order: Order, items_count: int | None) -> OrderListItemDTO:
@@ -103,7 +95,7 @@ async def get_user_order(db: AsyncSession, user: User, order_id: int) -> OrderDe
         .where(Order.id == order_id, Order.user_id == user.id)
     )
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        raise NotFound("Order not found", ctx={"order_id": order_id})
 
     payment = await db.scalar(
         select(Payment)
@@ -171,7 +163,7 @@ async def get_order_admin(db: AsyncSession, order_id: int) -> AdminOrderDetailsD
     )
     result = row.first()
     if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        raise NotFound("Order not found", ctx={"order_id": order_id})
 
     order, user_email = result
 
