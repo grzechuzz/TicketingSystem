@@ -1,7 +1,6 @@
-from fastapi import APIRouter, status, Depends, Response, Request
+from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.organizers.schemas import OrganizerCreateDTO, OrganizerReadDTO, OrganizerPutDTO, OrganizersQueryDTO
-from app.domain.users.models import User
 from app.core.dependencies.auth import get_current_user_with_roles
 from app.core.dependencies.events import require_organizer_member
 from app.core.database import get_db
@@ -18,16 +17,15 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=OrganizerReadDTO,
-    response_model_exclude_none=True
+    response_model_exclude_none=True,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
 async def create_organizer(
         schema: OrganizerCreateDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN"))],
-        response: Response,
-        request: Request
+        response: Response
 ):
-    organizer = await organizer_service.create_organizer(db, schema, user, request)
+    organizer = await organizer_service.create_organizer(db, schema)
     response.headers["Location"] = f"{router.prefix}/{organizer.id}"
     return organizer
 
@@ -65,19 +63,20 @@ async def get_organizer(organizer_id: int, db: db_dependency):
 async def update_organizer(
         organizer_id: Annotated[int, Depends(require_organizer_member)],
         schema: OrganizerPutDTO,
-        db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN", "ORGANIZER"))],
-        request: Request
+        db: db_dependency
+
 ):
-    organizer = await organizer_service.update_organizer(db, schema, organizer_id, user, request)
+    organizer = await organizer_service.update_organizer(db, schema, organizer_id)
     return organizer
 
 
-@router.delete("/{organizer_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{organizer_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
+)
 async def delete_organizer(
         organizer_id: int,
-        db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN"))],
-        request: Request
+        db: db_dependency
 ):
-    return await organizer_service.delete_organizer(db, organizer_id, user, request)
+    return await organizer_service.delete_organizer(db, organizer_id)
