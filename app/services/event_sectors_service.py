@@ -1,24 +1,31 @@
-from fastapi import HTTPException, status, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.allocation.models import EventSector
 from app.domain.events.models import Event
-from app.domain.users.models import User
 from app.domain.allocation import crud
 from app.domain.allocation.schemas import EventSectorCreateDTO, EventSectorBulkCreateDTO
 from app.services.venue_service import get_sector
 from app.core.auditing import AuditSpan
+from app.domain.exceptions import InvalidInput, NotFound, Conflict
 
 
 def _ensure_venue_match(event, sector):
     if event.venue_id != sector.venue_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sector does not belong to event venue")
+        raise InvalidInput(
+            "Sector does not belong to event venue",
+            ctx={
+                "event_id": event.id,
+                "event_venue_id": event.venue_id,
+                "sector_id": sector.id,
+                "sector_venue_id": sector.venue_id,
+            }
+        )
 
 
 async def get_event_sector(db: AsyncSession, event_id: int, sector_id: int) -> EventSector:
     event_sector = await crud.get_event_sector(db, event_id, sector_id)
     if not event_sector:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event sector not found")
+        raise NotFound("Event sector not found", ctx={"event_id": event_id, "sector_id": sector_id})
     return event_sector
 
 
@@ -30,14 +37,10 @@ async def create_event_sector(
         db: AsyncSession,
         schema: EventSectorCreateDTO,
         event: Event,
-        user: User,
-        request: Request
 ) -> EventSector:
     async with AuditSpan(
-            request,
             scope="EVENT_SECTORS",
             action="CREATE",
-            user=user,
             object_type="event_sector",
             organizer_id=getattr(event, "organizer_id", None),
             event_id=event.id,
@@ -55,7 +58,7 @@ async def create_event_sector(
         try:
             await db.flush()
         except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sector already assigned to this event")
+            raise Conflict("Sector already assigned to this event", ctx={"event_id": event.id, "sector_id": sector.id})
 
         span.object_id = event_sector.id
         span.meta["is_ga"] = sector.is_ga
@@ -66,15 +69,11 @@ async def bulk_create_event_sectors(
         db: AsyncSession,
         schema: EventSectorBulkCreateDTO,
         event: Event,
-        user: User,
-        request: Request
 ) -> None:
     sector_ids = [s.sector_id for s in schema.sectors]
     async with AuditSpan(
-            request,
             scope="EVENT_SECTORS",
             action="CREATE_BULK",
-            user=user,
             object_type="event_sector",
             organizer_id=getattr(event, "organizer_id", None),
             event_id=event.id,
@@ -93,12 +92,10 @@ async def bulk_create_event_sectors(
         await crud.bulk_add_event_sectors(db, event.id, data)
 
 
-async def delete_event_sector(db: AsyncSession, event_id: int, sector_id: int, user: User, request: Request) -> None:
+async def delete_event_sector(db: AsyncSession, event_id: int, sector_id: int) -> None:
     async with AuditSpan(
-            request,
             scope="EVENT_SECTORS",
             action="DELETE",
-            user=user,
             object_type="event_sector",
             event_id=event_id,
             meta={"sector_id": sector_id}
@@ -109,4 +106,4 @@ async def delete_event_sector(db: AsyncSession, event_id: int, sector_id: int, u
         try:
             await db.flush()
         except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event sector in use")
+            raise Conflict("Event sector in use", ctx={"event_id": event_id, "sector_id": sector_id})

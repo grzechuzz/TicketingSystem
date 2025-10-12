@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
-from fastapi import HTTPException, status, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
@@ -14,6 +13,7 @@ from app.domain.venues.models import Seat, Sector
 from app.domain.users.models import User
 from app.domain.booking.schemas import TicketHolderUpsertDTO, InvoiceRequestDTO, InvoiceUpsertDTO
 from app.core.auditing import AuditSpan
+from app.domain.exceptions import NotFound, Conflict, Unprocessable, InvalidInput
 
 RESERVATION_MINUTES = 15
 CENT = Decimal("0.01")
@@ -39,13 +39,13 @@ async def _require_event_on_sale_status(db: AsyncSession, event_id: int) -> Even
         select(Event).where(Event.id == event_id, Event.status == EventStatus.ON_SALE)
     )
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found or sale not started")
+        raise NotFound("Event not found or sale not started", ctx={"event_id": event_id})
 
     now = datetime.now(timezone.utc)
     if event.sales_start > now:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sales not started yet")
+        raise Conflict("Sales not started yet", ctx={"event_id": event_id})
     if event.sales_end < now:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sales ended")
+        raise Conflict("Sales ended", ctx={"event_id": event_id})
     return event
 
 
@@ -56,7 +56,10 @@ async def _load_ett_for_event(db: AsyncSession, ett_id: int, event_id: int) -> E
         .where(EventTicketType.id == ett_id, EventSector.event_id == event_id)
     )
     if not event_ticket_type:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ticket type does not match event")
+        raise Unprocessable(
+            "Ticket type does not match event",
+            ctx={"event_id": event_id, "event_ticket_type_id": ett_id}
+        )
     return event_ticket_type
 
 
@@ -72,16 +75,19 @@ async def _require_order(
         stmt = stmt.with_for_update()
     order = await db.scalar(stmt)
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_msg)
+        raise NotFound(not_found_msg, ctx={"user_id": user_id, "order_status": status_.name})
     return order
 
 
 async def _require_seat_in_sector(db: AsyncSession, seat_id: int, sector_id: int) -> Seat:
     seat = await db.scalar(select(Seat).where(Seat.id == seat_id))
     if not seat:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seat not found")
+        raise NotFound("Seat not found", ctx={"seat_id": seat_id})
     if seat.sector_id != sector_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seat does not match ticket type")
+        raise InvalidInput(
+            "Seat does not match ticket type",
+            ctx={"seat_id": seat_id, "expected_sector_id": sector_id, "actual_sector_id": seat.sector_id},
+        )
     return seat
 
 
@@ -98,7 +104,7 @@ async def _ensure_user_ticket_limit_not_exceeded(db: AsyncSession, user_id: int,
             )
         )
         if (current_count or 0) + 1 > event.max_tickets_per_user:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ticket limit for this event exceeded")
+            raise InvalidInput("Ticket limit for this event exceeded", ctx={"user_id": user_id, "event_id": event.id})
 
 
 async def _require_cart_has_items(db: AsyncSession, order_id: int) -> None:
@@ -106,7 +112,7 @@ async def _require_cart_has_items(db: AsyncSession, order_id: int) -> None:
         select(select(1).select_from(TicketInstance).where(TicketInstance.order_id == order_id).exists())
     )
     if not has_items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+        raise InvalidInput("Cart is empty", ctx={"order_id": order_id})
 
 
 async def _require_no_missing_holders(db: AsyncSession, order_id: int) -> None:
@@ -125,12 +131,15 @@ async def _require_no_missing_holders(db: AsyncSession, order_id: int) -> None:
         )
     )
     if missing_required_holder:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing holder data")
+        raise InvalidInput("Missing holder data", ctx={"order_id": order_id})
 
 
 def _require_not_expired(order: Order, now: datetime) -> None:
     if order.reserved_until < now:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reservation expired")
+        raise Conflict(
+            "Reservation expired",
+            ctx={"order_id": order.id, "reserved_until": order.reserved_until.isoformat()}
+        )
 
 
 async def _ga_decrement(db: AsyncSession, event_sector_id: int) -> None:
@@ -141,7 +150,7 @@ async def _ga_decrement(db: AsyncSession, event_sector_id: int) -> None:
         .returning(EventSector.tickets_left)
     )
     if left is None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No tickets left")
+        raise Conflict("No tickets left", ctx={"event_sector_id": event_sector_id})
 
 
 async def _ga_increment(db: AsyncSession, event_sector_id: int, count: int):
@@ -157,7 +166,6 @@ async def reserve_ticket(
         user: User,
         event_id: int,
         event_ticket_type_id: int,
-        request: Request,
         seat_id: int | None = None
 ) -> tuple[Order, TicketInstance]:
     """
@@ -167,10 +175,8 @@ async def reserve_ticket(
     - Prevents overselling & order correctness by utilizing FOR UPDATE clause and UNIQUE constraints
     """
     async with AuditSpan(
-        request,
         scope='BOOKING',
         action='RESERVE_TICKET',
-        user=user,
         object_type='ticket_instance',
         event_id=event_id,
         meta={"event_ticket_type_id": event_ticket_type_id, "seat_id": seat_id}
@@ -184,15 +190,18 @@ async def reserve_ticket(
             .with_for_update()
         )
         if awaiting_order and awaiting_order.reserved_until >= now:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Order awaiting payment")
+            raise Conflict("Order awaiting payment", ctx={"order_id": awaiting_order.id})
 
         # Part 2 - verify that ticket_type is matched to the correct event
         event_ticket_type = await _load_ett_for_event(db, event_ticket_type_id, event_id)
         is_ga = event_ticket_type.event_sector.sector.is_ga
         if is_ga and seat_id is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GA sector shouldn't include seat")
+            raise InvalidInput("GA sector shouldn't include seat", ctx={"event_id": event_id})
         if not is_ga and seat_id is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seat is required for this sector")
+            raise InvalidInput(
+                "Seat is required for this sector",
+                ctx={"event_id": event_id, "event_ticket_type_id": event_ticket_type_id}
+            )
 
         # Part 3 - create or find existing active order
         await db.execute(
@@ -248,7 +257,10 @@ async def reserve_ticket(
             try:
                 await db.flush()
             except IntegrityError:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Selected seat is not available")
+                raise Conflict(
+                    "Selected seat is not available",
+                    ctx={"event_id": event_id, "event_ticket_type_id": event_ticket_type_id, "seat_id": seat_id}
+                )
 
         # Part 6 - update order
         _bump_total(order, ticket_instance.price_gross_snapshot)
@@ -264,23 +276,26 @@ async def get_user_pending_order(db: AsyncSession, user: User) -> Order:
     return await _require_order(db, user.id, OrderStatus.PENDING, for_update=False)
 
 
-async def remove_ticket_instance(db: AsyncSession, user: User, ticket_instance_id: int, request: Request) -> None:
+async def remove_ticket_instance(db: AsyncSession, user: User, ticket_instance_id: int) -> None:
     async with AuditSpan(
-            request,
             scope="CART",
             action="REMOVE_ITEM",
-            user=user,
             object_type="ticket_instance",
             meta={"ticket_instance_id": ticket_instance_id}
     ) as span:
         ticket_instance = await db.scalar(select(TicketInstance).where(TicketInstance.id == ticket_instance_id))
         if not ticket_instance:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket instance not found")
+            raise NotFound("Ticket instance not found", ctx={"ticket_instance_id": ticket_instance_id})
 
-        order = await _require_order(db, user.id, OrderStatus.PENDING, for_update=True, not_found_msg="Item not found in order")
+        order = await _require_order(
+            db, user.id, OrderStatus.PENDING, for_update=True, not_found_msg="Item not found in order"
+        )
 
         if order.id != ticket_instance.order_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found in order")
+            raise NotFound(
+                "Item not found in order",
+                ctx={"ticket_instance_id": ticket_instance_id, "order_id": order.id}
+            )
 
         event_ticket_type = await db.scalar(
             select(EventTicketType)
@@ -305,14 +320,11 @@ async def upsert_ticket_holder(
         ticket_instance_id: int,
         schema: TicketHolderUpsertDTO,
         user: User,
-        request: Request
 ) -> TicketHolder:
     fields = list(schema.model_dump(exclude_none=True).keys())
     async with AuditSpan(
-        request,
         scope="CART",
         action="UPSERT_HOLDER",
-        user=user,
         object_type="ticket_holder",
         meta={"ticket_instance_id": ticket_instance_id, "fields": fields}
     ) as span:
@@ -327,13 +339,16 @@ async def upsert_ticket_holder(
             .with_for_update()
         )
         if not ticket_instance:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket instance not found in your order")
+            raise NotFound(
+                "Ticket instance not found in your order",
+                ctx={"ticket_instance_id": ticket_instance_id, "user_id": user.id},
+            )
 
         requires_holder = await db.scalar(
             select(Event.holder_data_required).where(Event.id == ticket_instance.event_id)
         )
         if not requires_holder:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Holder data not required for this event")
+            raise InvalidInput("Holder data not required for this event", ctx={"event_id": ticket_instance.event_id})
 
         if ticket_instance.ticket_holder:
             th = ticket_instance.ticket_holder
@@ -352,12 +367,10 @@ async def upsert_ticket_holder(
         return th
 
 
-async def set_invoice_requested(db: AsyncSession, schema: InvoiceRequestDTO, user: User, request: Request) -> None:
+async def set_invoice_requested(db: AsyncSession, schema: InvoiceRequestDTO, user: User) -> None:
     async with AuditSpan(
-            request,
             scope="CART",
             action="SET_INVOICE_REQUESTED",
-            user=user,
             object_type="order",
             meta={"invoice_requested": schema.invoice_requested}
     ) as span:
@@ -368,19 +381,17 @@ async def set_invoice_requested(db: AsyncSession, schema: InvoiceRequestDTO, use
         span.order_id = order.id
 
 
-async def upsert_invoice(db: AsyncSession, schema: InvoiceUpsertDTO, user: User, request: Request) -> Invoice:
+async def upsert_invoice(db: AsyncSession, schema: InvoiceUpsertDTO, user: User) -> Invoice:
     fields = list(schema.model_dump(exclude_none=True).keys())
     async with AuditSpan(
-            request,
             scope="CART",
             action="UPSERT_INVOICE",
-            user=user,
             object_type="invoice",
             meta={"fields": fields}
     ) as span:
         order = await _require_order(db, user.id, OrderStatus.PENDING, for_update=True)
         if not order.invoice_requested:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invoice not requested for this order")
+            raise InvalidInput("Invoice not requested for this order", ctx={"order_id": order.id})
 
         if order.invoice:
             invoice = order.invoice
@@ -405,7 +416,7 @@ async def process_order(db: AsyncSession, user: User) -> Order:
     await _require_cart_has_items(db, order.id)
 
     if order.invoice_requested and not order.invoice:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invoice data required")
+        raise InvalidInput("Invoice data required", ctx={"order_id": order.id})
 
     await _require_no_missing_holders(db, order.id)
 
@@ -416,12 +427,10 @@ async def process_order(db: AsyncSession, user: User) -> Order:
     return order
 
 
-async def checkout(db: AsyncSession, user: User, request: Request) -> Order:
+async def checkout(db: AsyncSession, user: User) -> Order:
     async with AuditSpan(
-            request,
             scope="CART",
             action="CHECKOUT",
-            user=user,
             object_type="order"
     ) as span:
         now = datetime.now(timezone.utc)
@@ -442,12 +451,10 @@ async def checkout(db: AsyncSession, user: User, request: Request) -> Order:
         return order
 
 
-async def reopen_cart(db: AsyncSession, user: User, request: Request) -> Order:
+async def reopen_cart(db: AsyncSession, user: User) -> Order:
     async with AuditSpan(
-            request,
             scope="CART",
             action="REOPEN",
-            user=user,
             object_type="order"
     ) as span:
         order = await _require_order(
@@ -472,7 +479,7 @@ async def reopen_cart(db: AsyncSession, user: User, request: Request) -> Order:
             )
         )
         if active_payment_exists:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment in progress")
+            raise Conflict("Payment in progress", ctx={"order_id": order.id})
 
         order.status = OrderStatus.PENDING
         _extend_reservation(order, now)

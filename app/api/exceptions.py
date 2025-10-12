@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from app.domain.exceptions import AppError, NotFound, Conflict, Unprocessable, Unauthorized, InvalidInput, Forbidden
+from app.domain.exceptions import AppError, NotFound, Conflict, Unprocessable, Unauthorized, InvalidInput, Forbidden, \
+    InternalError
 from app.core.ctx import REQUEST_ID_CTX
 
 MEDIA_TYPE = "application/problem+json"
@@ -13,6 +14,7 @@ _STATUS_BY_CLASS: dict[type[AppError], int] = {
     InvalidInput: status.HTTP_400_BAD_REQUEST,
     Unprocessable: status.HTTP_422_UNPROCESSABLE_ENTITY,
     AppError: status.HTTP_400_BAD_REQUEST,
+    InternalError: status.HTTP_500_INTERNAL_SERVER_ERROR
 }
 
 _TITLES: dict[type[AppError], str] = {
@@ -23,6 +25,7 @@ _TITLES: dict[type[AppError], str] = {
     InvalidInput: "Bad Request",
     Unprocessable: "Unprocessable Entity",
     AppError: "Application Error",
+    InternalError: "Internal Server Error",
 }
 
 def _www_authenticate_header(

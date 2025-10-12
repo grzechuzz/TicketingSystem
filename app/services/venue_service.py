@@ -1,25 +1,24 @@
-from fastapi import HTTPException, status, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.pagination import PageDTO
 from app.core.auditing import AuditSpan
-from app.domain.users.models import User
 from app.domain.venues.models import Venue, Sector, Seat
 from app.domain.venues.schemas import VenueCreateDTO, VenueUpdateDTO, SectorCreateDTO, SectorUpdateDTO, SeatCreateDTO, \
     SeatBulkCreateDTO, SeatUpdateDTO, VenuesQueryDTO, VenueReadDTO
 from app.domain.venues import crud
 from app.services.address_service import get_address
+from app.domain.exceptions import NotFound, Conflict, InvalidInput
 
 
 def _check_sector_allows_seats(sector: Sector) -> None:
     if sector.is_ga:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sector is GA - seats not allowed")
+        raise InvalidInput("Sector is GA - seats not allowed", ctx={"sector_id": sector.id})
 
 
 async def get_venue(db: AsyncSession, venue_id: int) -> Venue:
     venue = await crud.get_venue_by_id(db, venue_id)
     if not venue:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found")
+        raise NotFound("Venue not found", ctx={"venue_id": venue_id})
     return venue
 
 
@@ -34,12 +33,10 @@ async def list_venues(db: AsyncSession, query: VenuesQueryDTO) -> PageDTO[VenueR
     )
 
 
-async def create_venue(db: AsyncSession, schema: VenueCreateDTO, user: User, request: Request) -> Venue:
+async def create_venue(db: AsyncSession, schema: VenueCreateDTO) -> Venue:
     async with AuditSpan(
-        request,
         scope="VENUES",
         action="CREATE",
-        user=user,
         object_type="venue",
         meta={"address_id": schema.address_id}
     ) as span:
@@ -49,18 +46,16 @@ async def create_venue(db: AsyncSession, schema: VenueCreateDTO, user: User, req
         try:
             await db.flush()
         except IntegrityError as e:
-            raise HTTPException(status.HTTP_409_CONFLICT, detail="Venue with this address already exists") from e
+            raise Conflict("Venue with this address already exists", ctx={"address_id": schema.address_id}) from e
         span.object_id = venue.id
         return venue
 
 
-async def update_venue(db: AsyncSession, schema: VenueUpdateDTO, venue_id: int, user: User, request: Request) -> Venue:
+async def update_venue(db: AsyncSession, schema: VenueUpdateDTO, venue_id: int) -> Venue:
     fields = list(schema.model_dump(exclude_none=True).keys())
     async with AuditSpan(
-        request,
         scope="VENUES",
         action="UPDATE",
-        user=user,
         object_type="venue",
         object_id=venue_id,
         meta={"fields": fields}
@@ -71,14 +66,17 @@ async def update_venue(db: AsyncSession, schema: VenueUpdateDTO, venue_id: int, 
         try:
             await db.flush()
         except IntegrityError as e:
-            raise HTTPException(status.HTTP_409_CONFLICT, detail="Venue with this address already exists") from e
+            raise Conflict(
+                "Venue with this address already exists",
+                ctx={"venue_id": venue_id, "fields": fields}
+            ) from e
         return venue
 
 
 async def get_sector(db: AsyncSession, sector_id: int) -> Sector:
     sector = await crud.get_sector_by_id(db, sector_id)
     if not sector:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sector not found")
+        raise NotFound("Sector not found", ctx={"sector_id": sector_id})
     return sector
 
 
@@ -89,15 +87,11 @@ async def list_sectors_by_venue(db: AsyncSession, venue_id: int) -> list[Sector]
 async def create_sector(
         db: AsyncSession,
         venue_id: int,
-        schema: SectorCreateDTO,
-        user: User,
-        request: Request
+        schema: SectorCreateDTO
 ) -> Sector:
     async with AuditSpan(
-        request,
         scope="SECTORS",
         action="CREATE",
-        user=user,
         object_type="sector",
         meta={"venue_id": venue_id, "is_ga": schema.is_ga, "base_capacity": schema.base_capacity}
     ) as span:
@@ -108,7 +102,10 @@ async def create_sector(
         try:
             await db.flush()
         except IntegrityError as e:
-            raise HTTPException(status.HTTP_409_CONFLICT, detail="Sector name already in use for this venue") from e
+            raise Conflict(
+                "Sector name already in use for this venue",
+                ctx={"venue_id": venue_id, "name": schema.name}
+            ) from e
         span.object_id = sector.id
         return sector
 
@@ -116,16 +113,12 @@ async def create_sector(
 async def update_sector(
         db: AsyncSession,
         schema: SectorUpdateDTO,
-        sector_id: int,
-        user: User,
-        request: Request
+        sector_id: int
 ) -> Sector:
     fields = list(schema.model_dump(exclude_none=True).keys())
     async with AuditSpan(
-        request,
         scope="SECTORS",
         action="UPDATE",
-        user=user,
         object_type="sector",
         object_id=sector_id,
         meta={"fields": fields}
@@ -136,14 +129,17 @@ async def update_sector(
         try:
             await db.flush()
         except IntegrityError as e:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sector name already in use for this venue") from e
+            raise Conflict(
+                "Sector name already in use for this venue",
+                ctx={"sector_id": sector_id, "fields": fields}
+            ) from e
         return sector
 
 
 async def get_seat(db: AsyncSession, seat_id: int) -> Seat:
     seat = await crud.get_seat_by_id(db, seat_id)
     if not seat:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seat not found")
+        raise NotFound("Seat not found", ctx={"seat_id": seat_id})
     return seat
 
 
@@ -151,12 +147,10 @@ async def list_seats_by_sector(db: AsyncSession, sector_id: int) -> list[Seat]:
     return await crud.list_seats_by_sector(db, sector_id)
 
 
-async def create_seat(db: AsyncSession, schema: SeatCreateDTO, sector_id: int, user: User, request: Request) -> Seat:
+async def create_seat(db: AsyncSession, schema: SeatCreateDTO, sector_id: int) -> Seat:
     async with AuditSpan(
-        request,
         scope="SEATS",
         action="CREATE",
-        user=user,
         object_type="seat",
         meta={"sector_id": sector_id, "row": schema.row, "number": schema.number}
     ) as span:
@@ -168,7 +162,10 @@ async def create_seat(db: AsyncSession, schema: SeatCreateDTO, sector_id: int, u
         try:
             await db.flush()
         except IntegrityError as e:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat already exists") from e
+            raise Conflict(
+                "Seat already exists",
+                ctx={"sector_id": sector_id, "row": schema.row, "number": schema.number}
+            ) from e
         span.object_id = seat.id
         return seat
 
@@ -176,15 +173,11 @@ async def create_seat(db: AsyncSession, schema: SeatCreateDTO, sector_id: int, u
 async def bulk_create_seats(
         db: AsyncSession,
         schema: SeatBulkCreateDTO,
-        sector_id: int,
-        user: User,
-        request: Request
+        sector_id: int
 ) -> None:
     async with AuditSpan(
-        request,
         scope="SEATS",
         action="CREATE_BULK",
-        user=user,
         object_type="seat",
         meta={"sector_id": sector_id, "count": len(schema.seats)}
     ):
@@ -197,16 +190,12 @@ async def bulk_create_seats(
 async def update_seat(
         db: AsyncSession,
         schema: SeatUpdateDTO,
-        seat_id: int,
-        user: User,
-        request: Request
+        seat_id: int
 ) -> Seat:
     fields = list(schema.model_dump(exclude_none=True).keys())
     async with AuditSpan(
-        request,
         scope="SEATS",
         action="UPDATE",
-        user=user,
         object_type="seat",
         object_id=seat_id,
         meta={"fields": fields}
@@ -219,16 +208,17 @@ async def update_seat(
         try:
             await db.flush()
         except IntegrityError as e:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat already exists") from e
+            raise Conflict(
+                "Seat already exists",
+                ctx={"seat_id": seat_id, "fields": fields}
+            ) from e
         return seat
 
 
-async def delete_seat(db: AsyncSession, seat_id: int, user: User, request: Request) -> None:
+async def delete_seat(db: AsyncSession, seat_id: int) -> None:
     async with AuditSpan(
-        request,
         scope="SEATS",
         action="DELETE",
-        user=user,
         object_type="seat",
         object_id=seat_id
     ):
@@ -236,5 +226,5 @@ async def delete_seat(db: AsyncSession, seat_id: int, user: User, request: Reque
         await crud.delete_seat(db, seat)
         try:
             await db.flush()
-        except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat in use")
+        except IntegrityError as e:
+            raise Conflict("Seat in use", ctx={"seat_id": seat_id}) from e

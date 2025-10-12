@@ -1,6 +1,6 @@
 from app.core.pagination import PageDTO
 from app.services import venue_service
-from fastapi import APIRouter, status, Depends, Response, Request
+from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies.auth import get_current_user_with_roles
@@ -12,7 +12,7 @@ from app.domain.venues.schemas import (
     SectorCreateDTO, VenuesQueryDTO
 )
 from typing import Annotated
-from app.domain.users.models import User
+
 
 router = APIRouter(prefix='/venues', tags=['venues'])
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
@@ -22,16 +22,15 @@ db_dependency = Annotated[AsyncSession, Depends(get_db)]
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=VenueReadDTO,
-    response_model_exclude_none=True
+    response_model_exclude_none=True,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
 async def create_venue(
         schema: VenueCreateDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN'))],
-        response: Response,
-        request: Request
+        response: Response
 ):
-    venue = await venue_service.create_venue(db, schema, user, request)
+    venue = await venue_service.create_venue(db, schema)
     response.headers["Location"] = f"{router.prefix}/{venue.id}"
     return venue
 
@@ -61,16 +60,15 @@ async def get_venue(venue_id: int, db: db_dependency):
 @router.put(
     "/{venue_id}",
     status_code=status.HTTP_200_OK,
-    response_model=VenueReadDTO
+    response_model=VenueReadDTO,
+    dependencies=[Depends(get_current_user_with_roles('ADMIN'))]
 )
 async def update_venue(
         venue_id: int,
         schema: VenueUpdateDTO,
-        db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN'))],
-        request: Request
+        db: db_dependency
 ):
-    venue = await venue_service.update_venue(db, schema, venue_id, user, request)
+    venue = await venue_service.update_venue(db, schema, venue_id)
     return venue
 
 
@@ -79,17 +77,16 @@ async def update_venue(
     status_code=status.HTTP_201_CREATED,
     response_model=SectorReadDTO,
     response_model_exclude_none=True,
+    dependencies=[Depends(get_current_user_with_roles('ADMIN'))],
     name="create_sector_for_venue"
 )
 async def create_sector_for_venue(
         venue_id: int,
         schema: SectorCreateDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles('ADMIN'))],
         response: Response,
-        request: Request
 ):
-    sector = await venue_service.create_sector(db, venue_id, schema, user, request)
+    sector = await venue_service.create_sector(db, venue_id, schema)
     response.headers["Location"] = f"/sectors/{sector.id}"
     return sector
 

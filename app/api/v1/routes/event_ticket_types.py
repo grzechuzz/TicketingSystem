@@ -32,11 +32,10 @@ async def get_event_ticket_type(event_ticket_type_id: int, db: db_dependency):
 async def update_event_ticket_type(
         event_ticket_type_actor: Annotated[EventTicketTypeActor, Depends(require_event_ticket_type_access)],
         schema: EventTicketTypeUpdateDTO,
-        db: db_dependency,
-        request: Request
+        db: db_dependency
 ):
     return await event_ticket_type_service.update_event_ticket_type(
-        db, event_ticket_type_actor.event_ticket_type, schema, event_ticket_type_actor.user, request
+        db, event_ticket_type_actor.event_ticket_type, schema
     )
 
 
@@ -46,9 +45,6 @@ async def update_event_ticket_type(
 )
 async def delete_event_ticket_type(
         event_ticket_type_actor: Annotated[EventTicketTypeActor, Depends(require_event_ticket_type_access)],
-        db: db_dependency,
-        request: Request
+        db: db_dependency
 ):
-    await event_ticket_type_service.delete_event_ticket_type(
-        db, event_ticket_type_actor.event_ticket_type, event_ticket_type_actor.user, request
-    )
+    await event_ticket_type_service.delete_event_ticket_type(db, event_ticket_type_actor.event_ticket_type)

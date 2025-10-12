@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Response, Header, Request
+from fastapi import APIRouter, Depends, status, Response, Header
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -24,10 +24,9 @@ async def start_payment(
         db: db_dependency,
         user: user_dependency,
         response: Response,
-        request: Request,
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]
 ):
-    payment, redirect_url = await payment_service.start_payment(db, user, schema, idempotency_key, request)
+    payment, redirect_url = await payment_service.start_payment(db, user, schema, idempotency_key)
     response.headers["Location"] = f"{router.prefix}/{payment.id}"
     return {
         "id": payment.id,
@@ -53,9 +52,8 @@ async def finalize_payment(
         schema: PaymentFinalizeDTO,
         db: db_dependency,
         user: user_dependency,
-        request: Request
 ):
-    payment = await payment_service.finalize_payment(db, user, payment_id, schema.success, request)
+    payment = await payment_service.finalize_payment(db, user, payment_id, schema.success)
     return payment
 
 

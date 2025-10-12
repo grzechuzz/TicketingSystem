@@ -1,17 +1,16 @@
-from fastapi import HTTPException, status, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.pricing.models import TicketType
 from app.domain.pricing import crud
 from app.domain.pricing.schemas import TicketTypeCreateDTO
-from app.domain.users.models import User
 from app.core.auditing import AuditSpan
+from app.domain.exceptions import NotFound, Conflict
 
 
 async def get_ticket_type(db: AsyncSession, ticket_type_id: int) -> TicketType:
     ticket_type = await crud.get_ticket_type(db, ticket_type_id)
     if not ticket_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket type not found")
+        raise NotFound("Ticket type not found", ctx={"ticket_type_id": ticket_type_id})
     return ticket_type
 
 
@@ -19,12 +18,10 @@ async def list_ticket_types(db: AsyncSession) -> list[TicketType]:
     return await crud.list_ticket_types(db)
 
 
-async def create_ticket_type(db: AsyncSession, schema: TicketTypeCreateDTO, user: User, request: Request) -> TicketType:
+async def create_ticket_type(db: AsyncSession, schema: TicketTypeCreateDTO) -> TicketType:
     async with AuditSpan(
-        request,
         scope="TICKET_TYPES",
         action="CREATE",
-        user=user,
         object_type="ticket_type",
         meta={"name": schema.name}
     ) as span:
@@ -32,18 +29,16 @@ async def create_ticket_type(db: AsyncSession, schema: TicketTypeCreateDTO, user
         ticket_type = await crud.create_ticket_type(db, data)
         try:
             await db.flush()
-        except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ticket type already exists")
+        except IntegrityError as e:
+            raise Conflict("Ticket type already exists", ctx={"name": schema.name}) from e
         span.object_id = ticket_type.id
         return ticket_type
 
 
-async def delete_ticket_type(db: AsyncSession, ticket_type_id: int, user: User, request: Request) -> None:
+async def delete_ticket_type(db: AsyncSession, ticket_type_id: int) -> None:
     async with AuditSpan(
-        request,
         scope="TICKET_TYPES",
         action="DELETE",
-        user=user,
         object_type="ticket_type",
         object_id=ticket_type_id,
     ):
@@ -51,5 +46,5 @@ async def delete_ticket_type(db: AsyncSession, ticket_type_id: int, user: User, 
         await crud.delete_ticket_type(db, ticket_type)
         try:
             await db.flush()
-        except IntegrityError:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ticket type in use")
+        except IntegrityError as e:
+            raise Conflict("Ticket type in use", ctx={"ticket_type_id": ticket_type_id}) from e

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -30,8 +30,8 @@ async def get_cart(db: db_dependency, user: user_dependency):
     "/items/{ticket_instance_id}",
     status_code=status.HTTP_204_NO_CONTENT
 )
-async def remove_item(ticket_instance_id: int, db: db_dependency, user: user_dependency, request: Request):
-    await booking_service.remove_ticket_instance(db, user, ticket_instance_id, request)
+async def remove_item(ticket_instance_id: int, db: db_dependency, user: user_dependency):
+    await booking_service.remove_ticket_instance(db, user, ticket_instance_id)
 
 
 @router.put(
@@ -45,9 +45,8 @@ async def upsert_ticket_holder(
         schema: TicketHolderUpsertDTO,
         db: db_dependency,
         user: user_dependency,
-        request: Request
 ):
-    ticket_holder = await booking_service.upsert_ticket_holder(db, ticket_instance_id, schema, user, request)
+    ticket_holder = await booking_service.upsert_ticket_holder(db, ticket_instance_id, schema, user)
     return ticket_holder
 
 
@@ -55,8 +54,8 @@ async def upsert_ticket_holder(
     "/invoice-request",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def set_invoice_requested(schema: InvoiceRequestDTO, db: db_dependency, user: user_dependency, request: Request):
-    await booking_service.set_invoice_requested(db, schema, user, request)
+async def set_invoice_requested(schema: InvoiceRequestDTO, db: db_dependency, user: user_dependency):
+    await booking_service.set_invoice_requested(db, schema, user)
 
 
 @router.put(
@@ -65,8 +64,8 @@ async def set_invoice_requested(schema: InvoiceRequestDTO, db: db_dependency, us
     response_model=InvoiceReadDTO,
     response_model_exclude_none=True
 )
-async def upsert_invoice(schema: InvoiceUpsertDTO, db: db_dependency, user: user_dependency, request: Request):
-    invoice = await booking_service.upsert_invoice(db, schema, user, request)
+async def upsert_invoice(schema: InvoiceUpsertDTO, db: db_dependency, user: user_dependency):
+    invoice = await booking_service.upsert_invoice(db, schema, user)
     return invoice
 
 
@@ -76,8 +75,8 @@ async def upsert_invoice(schema: InvoiceUpsertDTO, db: db_dependency, user: user
     response_model=OrderDetailsDTO,
     response_model_exclude_none=True
 )
-async def checkout(db: db_dependency, user: user_dependency, request: Request):
-    order = await booking_service.checkout(db, user, request)
+async def checkout(db: db_dependency, user: user_dependency):
+    order = await booking_service.checkout(db, user)
     return order
 
 
@@ -87,8 +86,8 @@ async def checkout(db: db_dependency, user: user_dependency, request: Request):
     response_model=OrderDetailsDTO,
     response_model_exclude_none=True
 )
-async def reopen_cart(db: db_dependency, user: user_dependency, request: Request):
-    order = await booking_service.reopen_cart(db, user, request)
+async def reopen_cart(db: db_dependency, user: user_dependency):
+    order = await booking_service.reopen_cart(db, user)
     return order
 
 

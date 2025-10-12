@@ -1,7 +1,6 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from typing import Annotated, NamedTuple
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies.auth import get_current_user_with_roles
@@ -9,6 +8,7 @@ from app.domain.users.models import User
 from app.domain.events.models import Event
 from app.domain.pricing.models import EventTicketType
 from app.domain.allocation.models import EventSector
+from app.domain.exceptions import NotFound, Forbidden
 
 ADMIN_OR_ORG = get_current_user_with_roles('ADMIN', 'ORGANIZER')
 
@@ -26,13 +26,14 @@ class EventTicketTypeActor(NamedTuple):
 async def _ensure_event_owner(event_id: int, db: AsyncSession, user: User) -> Event:
     event = (await db.execute(select(Event).where(Event.id == event_id))).scalars().first()
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise NotFound("Event not found", ctx={"event_id": event_id})
 
-    if any(r.name == "ADMIN" for r in user.roles):
+    roles = {r.name for r in user.roles}
+    if "ADMIN" in roles:
         return event
 
     if event.organizer_id not in {o.id for o in user.organizers}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+        raise Forbidden("Not allowed", ctx={"event_id": event_id, "reason": "organizer_mismatch"})
 
     return event
 
@@ -41,11 +42,12 @@ def require_organizer_member(
         organizer_id: int,
         user: Annotated[User, Depends(ADMIN_OR_ORG)]
 ) -> int:
-    if any(r.name == "ADMIN" for r in user.roles):
+    roles = {r.name for r in user.roles}
+    if "ADMIN" in roles:
         return organizer_id
 
     if organizer_id not in {o.id for o in user.organizers}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+        raise Forbidden("Not allowed", ctx={"organizer_id": organizer_id, "reason": "organizer_mismatch"})
 
     return organizer_id
 
@@ -81,7 +83,7 @@ async def require_event_ticket_type_access(
     row = result.tuples().first()
 
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event ticket type not found")
+        raise NotFound("Event ticket type not found", ctx={"event_ticket_type_id": event_ticket_type_id})
 
     event_ticket_type, event_id = row
     await _ensure_event_owner(event_id, db=db, user=user)
