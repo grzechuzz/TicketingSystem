@@ -1,6 +1,7 @@
 import pytest
 import importlib
 
+
 SERVICE_MODULES = [
     "app.services.address_service",
     "app.services.auth_service",
@@ -15,25 +16,42 @@ SERVICE_MODULES = [
 ]
 
 class _StubSpan:
-    def __init__(self, *a, **k):
-        self.kwargs = k
-        self.request = a[0] if a else k.get("request")
-        self.scope = k.get('scope')
-        self.action = k.get('action')
-        self.user = k.get('user')
-        self.object_type = k.get('object_type')
-        self.object_id = k.get('object_id')
-        self.organizer_id = k.get('organizer_id')
-        self.event_id = k.get('event_id')
-        self.order_id = k.get('order_id')
-        self.payment_id = k.get('payment_id')
-        self.invoice_id = k.get('invoice_id')
-        self.meta = dict(k.get('meta', {}))
+    def __init__(
+        self,
+        *,
+        scope: str,
+        action: str,
+        object_type: str | None = None,
+        object_id: int | None = None,
+        organizer_id: int | None = None,
+        event_id: int | None = None,
+        order_id: int | None = None,
+        payment_id: int | None = None,
+        invoice_id: int | None = None,
+        meta: dict | None = None,
+        **_ignored
+    ):
+        self.scope = scope
+        self.action = action
+        self.object_type = object_type
+        self.object_id = object_id
+        self.organizer_id = organizer_id
+        self.event_id = event_id
+        self.order_id = order_id
+        self.payment_id = payment_id
+        self.invoice_id = invoice_id
+        self.meta = dict(meta or {})
+        self.entered = False
+        self.exited = False
+        self.exit_args = None
 
     async def __aenter__(self):
+        self.entered = True
         return self
 
-    async def __aexit__(self, *a):
+    async def __aexit__(self, exc_type, exc, tb):
+        self.exited = True
+        self.exit_args = (exc_type, exc, tb)
         return False
 
 
