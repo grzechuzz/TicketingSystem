@@ -1,10 +1,9 @@
 from app.services import venue_service
-from fastapi import APIRouter, status, Depends, Response, Request
+from fastapi import APIRouter, status, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies.auth import get_current_user_with_roles
 from app.domain.venues.schemas import SectorReadDTO, SectorUpdateDTO, SeatReadDTO, SeatCreateDTO, SeatBulkCreateDTO
-from app.domain.users.models import User
 from typing import Annotated
 
 
@@ -26,48 +25,45 @@ async def get_sector(sector_id: int, db: db_dependency):
 @router.patch(
     "/{sector_id}",
     status_code=status.HTTP_200_OK,
-    response_model=SectorReadDTO
+    response_model=SectorReadDTO,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
 async def rename_sector(
         sector_id: int,
         schema: SectorUpdateDTO,
-        db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN"))],
-        request: Request
+        db: db_dependency
 ):
-    return await venue_service.update_sector(db, schema, sector_id, user, request)
+    return await venue_service.update_sector(db, schema, sector_id)
 
 
 @router.post(
     "/{sector_id}/seats",
     status_code=status.HTTP_201_CREATED,
-    response_model=SeatReadDTO
+    response_model=SeatReadDTO,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
 async def create_seat_for_sector(
         sector_id: int,
         schema: SeatCreateDTO,
         db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN"))],
-        response: Response,
-        request: Request
+        response: Response
 ):
-    seat = await venue_service.create_seat(db, schema, sector_id, user, request)
+    seat = await venue_service.create_seat(db, schema, sector_id)
     response.headers["Location"] = f"/seats/{seat.id}"
     return seat
 
 
 @router.post(
     "/{sector_id}/seats/bulk",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user_with_roles("ADMIN"))]
 )
 async def bulk_add_seats_for_sector(
         sector_id: int,
         schema: SeatBulkCreateDTO,
-        db: db_dependency,
-        user: Annotated[User, Depends(get_current_user_with_roles("ADMIN"))],
-        request: Request
+        db: db_dependency
 ):
-    return await venue_service.bulk_create_seats(db, schema, sector_id, user, request)
+    return await venue_service.bulk_create_seats(db, schema, sector_id)
 
 
 @router.get(
