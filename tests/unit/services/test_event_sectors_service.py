@@ -135,7 +135,7 @@ async def test_bulk_create_event_sectors_mixed_payload(mocker):
     ga_sector = mocker.Mock(id=1, venue_id=1, is_ga=True, base_capacity=250)
     non_ga_sector = mocker.Mock(id=2, venue_id=1, is_ga=False, base_capacity=300)
 
-    async def get_sector_side_effect(sector_id):
+    async def get_sector_side_effect(db, sector_id):
         return ga_sector if sector_id == 1 else non_ga_sector
 
     mocker.patch(
