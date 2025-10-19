@@ -13,6 +13,7 @@ from app.core.config import REFRESH_TOKEN_PEPPER, REFRESH_TOKEN_TTL_DAYS, ACCESS
     REFRESH_SLIDING
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.exceptions import InternalError, Conflict, Unauthorized, Forbidden
+from anyio import to_thread
 
 
 async def create_user(model: UserCreateDTO, db: AsyncSession) -> User:
@@ -20,7 +21,7 @@ async def create_user(model: UserCreateDTO, db: AsyncSession) -> User:
     payload["email"] = payload["email"].strip().lower()
 
     async with AuditSpan(scope="AUTH", action="REGISTER", object_type="user") as span:
-        hashed_password = hash_password(model.password.get_secret_value())
+        hashed_password = await to_thread.run_sync(hash_password, model.password.get_secret_value())
         user = User(**payload)
         user.password_hash = hashed_password
 
@@ -41,7 +42,10 @@ async def create_user(model: UserCreateDTO, db: AsyncSession) -> User:
 
 async def authenticate_user(email: str, password: str, db: AsyncSession) -> User:
     user = await get_user_by_email(email.strip().lower(), db)
-    if not user or not verify_password(password, user.password_hash):
+    ok = False
+    if user:
+        ok = await to_thread.run_sync(verify_password, password, user.password_hash)
+    if not user or not ok:
         raise Unauthorized("Incorrect email or password", ctx={"reason": "bad_credentials"})
     if not user.is_active:
         raise Forbidden("Account is inactive", ctx={"reason": "inactive"})
