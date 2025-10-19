@@ -50,6 +50,6 @@ def get_current_user_with_roles(*allowed_roles: str):
         AUTH_USER_ID_CTX.set(user.id)
 
         if allowed and roles.isdisjoint(allowed):
-            raise Forbidden("Permission denied", ctx={"required": allowed_roles, "user_roles": list(roles)})
+            raise Forbidden("Permission denied", ctx={"required": list(allowed_roles), "user_roles": list(roles)})
         return user
     return _inner
