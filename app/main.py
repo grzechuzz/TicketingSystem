@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(HttpContextMiddleware, header_name="X-Request-ID")
+app.add_middleware(HttpContextMiddleware)
 app.add_middleware(RequestIdMiddleware, header_name="X-Request-ID")
 
 register_error_handler(app)

@@ -18,21 +18,20 @@ class HttpContextMiddleware(BaseHTTPMiddleware):
         self.request_id_header = request_id_header
 
     async def dispatch(self, request: Request, call_next):
-        tokens = []
+        tokens: list[tuple] = []
         try:
             req_id = request.headers.get(self.request_id_header)
-            if REQUEST_ID_CTX.get() is None and req_id:
-                tokens.append(REQUEST_ID_CTX.set(req_id))
+            if req_id is not None:
+                tokens.append((REQUEST_ID_CTX, REQUEST_ID_CTX.set(req_id)))
 
-            tokens.append(ROUTE_CTX.set(_http_route(request)))
-            tokens.append(CLIENT_IP_CTX.set(_client_ip(request)))
+            tokens.append((ROUTE_CTX, ROUTE_CTX.set(_http_route(request))))
+            tokens.append((CLIENT_IP_CTX, CLIENT_IP_CTX.set(_client_ip(request))))
 
             redis_client = getattr(request.app.state, "redis", None)
             if redis_client:
-                tokens.append(REDIS_CTX.set(redis_client))
+                tokens.append((REDIS_CTX, REDIS_CTX.set(redis_client)))
 
-            response = await call_next(request)
-            return response
+            return await call_next(request)
         finally:
-            for t in reversed(tokens):
-                t.reset()
+            for var, token in reversed(tokens):
+                var.reset(token)
