@@ -1,11 +1,23 @@
-def create_db(mocker, value):
-    fake_scalars = mocker.Mock()
-    fake_scalars.first = mocker.Mock(return_value=value)
-    fake_result = mocker.Mock()
-    fake_result.scalars = mocker.Mock(return_value=fake_scalars)
+def db_with_scalars_first(mocker, value):
+    res = mocker.Mock()
+    res.scalars.return_value.first.return_value = value
     db = mocker.Mock()
-    db.execute = mocker.AsyncMock(return_value=fake_result)
-    return db, fake_result, fake_scalars
+    db.execute = mocker.AsyncMock(return_value=res)
+    return db, res
+
+
+def db_with_tuples_first(mocker, tuple_value):
+    res = mocker.Mock()
+    res.tuples.return_value.first.return_value = tuple_value
+    db = mocker.Mock()
+    db.execute = mocker.AsyncMock(return_value=res)
+    return db, res
+
+
+def db_with_scalar(mocker, value):
+    db = mocker.Mock()
+    db.scalar = mocker.AsyncMock(return_value=value)
+    return db
 
 
 def create_role(mocker, name: str):
