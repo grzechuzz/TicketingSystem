@@ -9,6 +9,7 @@ services:
       - db_password
       - secret_key
       - refresh_token_pepper
+      - admin_password
     ports:
       - "8000:8000"
     depends_on:
@@ -51,6 +52,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+    entrypoint: []
     command: ["python", "-m", "app.workers.audit_worker"]
     restart: unless-stopped
 volumes:
@@ -64,3 +66,5 @@ secrets:
     file: ./secrets/secret_key
   refresh_token_pepper:
     file: ./secrets/refresh_token_pepper
+  admin_password:
+    file: ./secrets/admin_password

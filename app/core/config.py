@@ -1,5 +1,6 @@
 import os
 
+
 def get_secret(secret_name: str) -> str | None:
     secret_path = f'/run/secrets/{secret_name}'
     try:
@@ -36,3 +37,6 @@ AUDIT_STREAM = os.getenv("AUDIT_STREAM", "audit:events")
 AUDIT_GROUP = os.getenv("AUDIT_GROUP", "audit-g1")
 AUDIT_BATCH = int(os.getenv("AUDIT_BATCH", "200"))
 AUDIT_BLOCK_MS = int(os.getenv("AUDIT_BLOCK_MS", "5000"))
+
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+ADMIN_PASSWORD = get_secret("admin_password")
