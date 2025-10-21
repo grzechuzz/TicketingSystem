@@ -1,8 +1,9 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, SecretStr, model_validator
-from phonenumbers import parse, is_valid_number, format_number, PhoneNumberFormat, NumberParseException
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, SecretStr, model_validator, computed_field
 from datetime import date, datetime
-from typing import Literal
-import re
+from app.core.utils.validators import check_password_strength, normalize_phone_or_none, ensure_passwords_match
+
+
+ALLOWED_ROLES = {"CUSTOMER", "ORGANIZER"}
 
 
 class UserCreateDTO(BaseModel):
@@ -19,39 +20,15 @@ class UserCreateDTO(BaseModel):
     birth_date: date | None = Field(default=None)
 
     @field_validator('password')
-    def check_password(cls, v: SecretStr) -> SecretStr:
-        password = v.get_secret_value()
-        errors = []
-        if not re.search(r'[a-z]', password):
-            errors.append('a lowercase letter')
-        if not re.search(r'[A-Z]', password):
-            errors.append('an uppercase letter')
-        if not re.search(r'\d', password):
-            errors.append('a digit')
-        if not re.search(r'[^\w\s]', password):
-            errors.append('a special character')
-        if errors:
-            needed = ', '.join(errors)
-            raise ValueError(f'Password must contain: {needed}')
+    def _check_password(cls, v: SecretStr) -> SecretStr:
+        check_password_strength(v)
         return v
 
-    @field_validator("phone_number")
-    def check_phone_number(cls, v: str | None) -> str | None:
-        if v is None or v.strip() == "":
-            return None
-        try:
-            num = parse(v, None)
-        except NumberParseException:
-            raise ValueError('Invalid phone number')
-        if not is_valid_number(num):
-            raise ValueError('Invalid phone number')
-        return format_number(num, PhoneNumberFormat.E164)
+    _phone = field_validator('phone_number', mode="before")(normalize_phone_or_none)
 
     @model_validator(mode="after")
-    def passwords_match(self):
-        if self.password.get_secret_value() != self.password_confirm.get_secret_value():
-            raise ValueError("Passwords do not match")
-        return self
+    def _passwords_match(self):
+        return ensure_passwords_match(self, self.password, self.password_confirm)
 
 
 class UserReadDTO(BaseModel):
@@ -63,3 +40,80 @@ class UserReadDTO(BaseModel):
     last_name: str
     phone_number: str | None
     birth_date: date | None
+
+
+class RoleReadDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
+class AdminUserListItemDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
+    phone_number: str | None
+    first_name: str
+    last_name: str
+    created_at: datetime
+    roles: list[RoleReadDTO]
+
+    @computed_field(return_type=bool)
+    @property
+    def is_admin(self) -> bool:
+        return any(r.name == "ADMIN" for r in self.roles)
+
+
+class AdminUsersQueryDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=200)
+    email: str | None = None
+    name: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
+
+
+class PasswordChangeDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    old_password: SecretStr = Field(min_length=8, max_length=64)
+    new_password: SecretStr = Field(min_length=8, max_length=64)
+    confirm_new_password: SecretStr = Field(min_length=8, max_length=64)
+
+    @field_validator('new_password')
+    def _check_password(cls, v: SecretStr) -> SecretStr:
+        check_password_strength(v)
+        return v
+
+    @model_validator(mode="after")
+    def _passwords_match(self):
+        return ensure_passwords_match(self, self.new_password, self.confirm_new_password)
+
+
+class UserRolesUpdateDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    roles: list[str] = Field(default_factory=list, max_length=2)
+
+    @field_validator('roles', mode='before')
+    def _normalize(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            v = [v]
+
+        seen, out = set(), []
+        for x in v:
+            n = str(x).strip().upper()
+            if not n or n not in ALLOWED_ROLES:
+                raise ValueError(f'Invalid role: {x}')
+            if n not in seen:
+                seen.add(n)
+                out.append(n)
+        return out
