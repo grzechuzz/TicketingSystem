@@ -24,7 +24,7 @@ Also features an integrated auditing module (Redis Streams + background worker) 
 ### 4. Access the API
 Swagger UI: http://127.0.0.1:8000/docs 
 
-Admin credentials are displayed in the terminal output after running **setup.sh** script. You can use them to log in via the `auth/login` endpoint in Swagger.
+Admin credentials are displayed in the terminal output after running **setup.sh** script. You can use them to log in via the `/auth/login` endpoint in Swagger.
 ### Useful commands
 API logs: <kbd>docker compose logs -f api</kbd>\
 Stop: <kbd>docker compose down</kbd>\
