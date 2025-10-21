@@ -20,8 +20,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(HttpContextMiddleware)
 app.add_middleware(RequestIdMiddleware, header_name="X-Request-ID")
+app.add_middleware(HttpContextMiddleware)
 
 register_error_handler(app)
 
@@ -42,4 +42,5 @@ app.include_router(orders.router)
 app.include_router(invoices.router)
 app.include_router(tickets.router)
 app.include_router(users.router)
-app.include_router(admin_maintenance.router)
+# app.include_router(admin_maintenance.router)
+app.include_router(users.router)
