@@ -1,6 +1,9 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, SecretStr, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, SecretStr, model_validator, computed_field
 from datetime import date, datetime
 from app.core.utils.validators import check_password_strength, normalize_phone_or_none, ensure_passwords_match
+
+
+ALLOWED_ROLES = {"CUSTOMER", "ORGANIZER"}
 
 
 class UserCreateDTO(BaseModel):
@@ -47,14 +50,20 @@ class RoleReadDTO(BaseModel):
 
 
 class AdminUserListItemDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     email: EmailStr
     phone_number: str | None
     first_name: str
     last_name: str
-    is_admin: bool
     created_at: datetime
     roles: list[RoleReadDTO]
+
+    @computed_field(return_type=bool)
+    @property
+    def is_admin(self) -> bool:
+        return any(r.name == "ADMIN" for r in self.roles)
 
 
 class AdminUsersQueryDTO(BaseModel):
@@ -63,6 +72,7 @@ class AdminUsersQueryDTO(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=200)
     email: str | None = None
+    name: str | None = None
     role: str | None = None
     is_active: bool | None = None
     created_from: datetime | None = None
@@ -84,3 +94,26 @@ class PasswordChangeDTO(BaseModel):
     @model_validator(mode="after")
     def _passwords_match(self):
         return ensure_passwords_match(self, self.new_password, self.confirm_new_password)
+
+
+class UserRolesUpdateDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    roles: list[str] = Field(default_factory=list, max_length=2)
+
+    @field_validator('roles', mode='before')
+    def _normalize(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            v = [v]
+
+        seen, out = set(), []
+        for x in v:
+            n = str(x).strip().upper()
+            if not n or n not in ALLOWED_ROLES:
+                raise ValueError(f'Invalid role: {x}')
+            if n not in seen:
+                seen.add(n)
+                out.append(n)
+        return out
